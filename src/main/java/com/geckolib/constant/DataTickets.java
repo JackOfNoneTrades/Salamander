@@ -23,6 +23,7 @@ public final class DataTickets {
     public static final DataTicket<Float> HEAD_PITCH = DataTicket.create("head_pitch", Float.class);
     public static final DataTicket<Boolean> IS_CHILD = DataTicket.create("is_child", Boolean.class);
     public static final DataTicket<Boolean> IS_SITTING = DataTicket.create("is_sitting", Boolean.class);
+    public static final DataTicket<Boolean> IS_FIRST_PERSON = DataTicket.create("is_first_person", Boolean.class);
     public static final DataTicket<Integer> RENDER_COLOR = DataTicket.create("render_color", Integer.class);
     public static final DataTicket<Integer> PACKED_LIGHT = DataTicket.create("packed_light", Integer.class);
     public static final DataTicket<GeoVector> POSITION = DataTicket.create("position", GeoVector.class);

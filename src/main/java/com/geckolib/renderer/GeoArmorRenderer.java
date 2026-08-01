@@ -1,20 +1,24 @@
 package com.geckolib.renderer;
 
 import java.nio.FloatBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.ModelBiped;
 import net.minecraft.client.model.ModelRenderer;
+import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.EnumAction;
 import net.minecraft.item.ItemArmor;
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.ResourceLocation;
 
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
@@ -31,6 +35,7 @@ import com.geckolib.loading.math.MolangContext;
 import com.geckolib.loading.math.value.Variable;
 import com.geckolib.model.GeoModel;
 import com.geckolib.renderer.base.GeoRenderer;
+import com.geckolib.renderer.base.GlStateSnapshot;
 import com.geckolib.renderer.layer.GeoRenderLayer;
 import com.geckolib.renderer.layer.GeoRenderLayersContainer;
 
@@ -46,6 +51,8 @@ public class GeoArmorRenderer<T extends ItemArmor & GeoItem> extends ModelBiped 
         .create("geoarmor_is_geckolib_wearer", Boolean.class);
 
     private static final float MODEL_OFFSET = 24 / 16f + 0.001f;
+    private static final ResourceLocation ENCHANTED_ITEM_GLINT = new ResourceLocation(
+        "textures/misc/enchanted_item_glint.png");
     private static final Map<ItemArmor, GeoArmorRenderer<?>> RENDERERS = Collections
         .synchronizedMap(new IdentityHashMap<ItemArmor, GeoArmorRenderer<?>>());
     private static final List<ArmorSegment> HEAD_SEGMENTS = Collections.singletonList(ArmorSegment.HEAD);
@@ -77,6 +84,9 @@ public class GeoArmorRenderer<T extends ItemArmor & GeoItem> extends ModelBiped 
     private float ageInTicks;
     private float netHeadYaw;
     private float headPitch;
+    private List<ArmorSegment> firstPersonSegments;
+    private List<ArmorSegment> poseSegments;
+    private Integer renderColorOverride;
 
     public GeoArmorRenderer(GeoModel<T> model) {
         super(1);
@@ -157,6 +167,42 @@ public class GeoArmorRenderer<T extends ItemArmor & GeoItem> extends ModelBiped 
         return 0xFFFFFFFF;
     }
 
+    /** Whether this chest-armor renderer should add geometry to vanilla's first-person arm pass. */
+    public boolean shouldRenderFirstPersonArm(T animatable, ItemStack stack, EntityPlayer wearer) {
+        return true;
+    }
+
+    /** Segments rendered for each vanilla first-person arm call. Minecraft 1.7 always supplies its right arm. */
+    public List<ArmorSegment> getFirstPersonSegments(T animatable, ItemStack stack, EntityPlayer wearer) {
+        return Collections.singletonList(ArmorSegment.RIGHT_ARM);
+    }
+
+    /** ARGB tint for the first-person pass, before any vanilla armor dye color is multiplied in. */
+    public int getFirstPersonRenderColor(T animatable, ItemStack stack, EntityPlayer wearer, float partialTicks) {
+        return getRenderColor(animatable, stack, ArmorRenderSlot.CHEST, partialTicks);
+    }
+
+    /** Additional first-person model-root transform applied before the standard armor-model transform. */
+    protected void applyFirstPersonTransform(T animatable, ItemStack stack, EntityPlayer wearer, float partialTicks) {}
+
+    /** First-person-specific pose hook, called after the ordinary armor pose hook. */
+    protected void applyFirstPersonRenderPose(T animatable, ItemStack stack, EntityPlayer wearer, ModelPose pose,
+        float partialTicks) {}
+
+    /** Attempts to render registered GeckoLib chest armor over one vanilla first-person arm call. */
+    public static boolean renderFirstPersonArm(EntityPlayer wearer, float partialTicks) {
+        if (wearer == null) return false;
+
+        ItemStack stack = wearer.inventory.armorItemInSlot(2);
+
+        if (stack == null || !(stack.getItem() instanceof ItemArmor) || !(stack.getItem() instanceof GeoItem))
+            return false;
+
+        GeoArmorRenderer<?> renderer = getArmorRenderer((ItemArmor) stack.getItem());
+
+        return renderer != null && renderer.renderFirstPersonArmUnchecked(wearer, stack, partialTicks);
+    }
+
     /** Called by {@link com.geckolib.animatable.GeoArmorItem} before Forge renders an armor pass. */
     public final void prepareForRender(EntityLivingBase entity, ItemStack stack, int armorSlot) {
         if (entity == null) throw new IllegalArgumentException("Armor wearer cannot be null");
@@ -197,10 +243,7 @@ public class GeoArmorRenderer<T extends ItemArmor & GeoItem> extends ModelBiped 
         GL11.glPushMatrix();
 
         try {
-            applyChildTransform();
-            GL11.glTranslatef(0, MODEL_OFFSET, 0);
-            GL11.glScalef(-this.scaleWidth, -this.scaleHeight, this.scaleWidth);
-            GL11.glTranslatef(0, 0.01f, 0);
+            applyArmorRootTransform(true);
 
             if (!textureEnabled || this.renderedSincePrepare) {
                 ensureCurrentPose(partialTicks);
@@ -252,6 +295,13 @@ public class GeoArmorRenderer<T extends ItemArmor & GeoItem> extends ModelBiped 
         fitToBiped(pose);
         hideUnusedSegments(pose);
         applyRenderPose(animatable, this.currentStack, this.currentEntity, this.currentSlot, pose, partialTicks);
+
+        if (isFirstPersonRender()) applyFirstPersonRenderPose(
+            animatable,
+            this.currentStack,
+            (EntityPlayer) this.currentEntity,
+            pose,
+            partialTicks);
     }
 
     /** Supplies common Bedrock wearer queries. Unknown queries resolve to zero. */
@@ -273,6 +323,8 @@ public class GeoArmorRenderer<T extends ItemArmor & GeoItem> extends ModelBiped 
                 return wearer.isBurning() ? 1 : 0;
             case "query.is_alive":
                 return wearer.isEntityAlive() ? 1 : 0;
+            case "query.is_first_person":
+                return isFirstPersonRender() ? 1 : 0;
             case "query.health":
                 return wearer.getHealth();
             case "query.max_health":
@@ -319,11 +371,13 @@ public class GeoArmorRenderer<T extends ItemArmor & GeoItem> extends ModelBiped 
             .getManagerForId(instanceId);
         boolean sitting = this.currentEntity.isRiding() && this.currentEntity.ridingEntity != null
             && this.currentEntity.ridingEntity.shouldRiderSit();
-        int color = getRenderColor(
-            animatable,
-            this.currentStack,
-            this.currentSlot,
-            this.ageInTicks - this.currentEntity.ticksExisted);
+        int color = this.renderColorOverride == null
+            ? getRenderColor(
+                animatable,
+                this.currentStack,
+                this.currentSlot,
+                this.ageInTicks - this.currentEntity.ticksExisted)
+            : this.renderColorOverride;
 
         manager.setAnimatableData(DataTickets.ENTITY, this.currentEntity);
         manager.setAnimatableData(DataTickets.ITEM_STACK, this.currentStack);
@@ -336,6 +390,15 @@ public class GeoArmorRenderer<T extends ItemArmor & GeoItem> extends ModelBiped 
         manager.setAnimatableData(DataTickets.HEAD_PITCH, this.headPitch);
         manager.setAnimatableData(DataTickets.IS_CHILD, this.currentEntity.isChild());
         manager.setAnimatableData(DataTickets.IS_SITTING, sitting);
+        manager.setAnimatableData(DataTickets.IS_FIRST_PERSON, isFirstPersonRender());
+        manager.setAnimatableData(
+            DataTickets.PACKED_LIGHT,
+            this.currentEntity.worldObj == null ? 0
+                : this.currentEntity.worldObj.getLightBrightnessForSkyBlocks(
+                    (int) Math.floor(this.currentEntity.posX),
+                    (int) Math.floor(this.currentEntity.posY),
+                    (int) Math.floor(this.currentEntity.posZ),
+                    0));
         manager.setAnimatableData(DataTickets.RENDER_COLOR, color);
     }
 
@@ -345,13 +408,15 @@ public class GeoArmorRenderer<T extends ItemArmor & GeoItem> extends ModelBiped 
         this.poseEntity = this.currentEntity;
         this.poseSlot = this.currentSlot;
         this.poseInstanceId = instanceId;
+        this.poseSegments = getCurrentSegments();
     }
 
     private boolean isPoseCurrent(long instanceId) {
         return this.activePose != null && this.poseArmorItem == this.currentArmorItem
             && this.poseEntity == this.currentEntity
             && this.poseSlot == this.currentSlot
-            && this.poseInstanceId == instanceId;
+            && this.poseInstanceId == instanceId
+            && this.poseSegments.equals(getCurrentSegments());
     }
 
     private void renderVanillaPass() {
@@ -361,7 +426,7 @@ public class GeoArmorRenderer<T extends ItemArmor & GeoItem> extends ModelBiped 
     }
 
     private void fitToBiped(ModelPose pose) {
-        for (ArmorSegment segment : getSegmentsForSlot(this.currentSlot)) {
+        for (ArmorSegment segment : getCurrentSegments()) {
             BoneSnapshot snapshot = pose.get(getBoneNameForSegment(segment))
                 .orElse(null);
 
@@ -400,7 +465,7 @@ public class GeoArmorRenderer<T extends ItemArmor & GeoItem> extends ModelBiped 
     }
 
     private void hideUnusedSegments(ModelPose pose) {
-        List<ArmorSegment> visibleSegments = getSegmentsForSlot(this.currentSlot);
+        List<ArmorSegment> visibleSegments = getCurrentSegments();
 
         for (ArmorSegment segment : ArmorSegment.values()) {
             if (visibleSegments.contains(segment)) continue;
@@ -464,6 +529,138 @@ public class GeoArmorRenderer<T extends ItemArmor & GeoItem> extends ModelBiped 
             GL11.glScalef(0.5f, 0.5f, 0.5f);
             GL11.glTranslatef(0, 1.5f, 0);
         }
+    }
+
+    private boolean renderFirstPersonArmUnchecked(EntityPlayer wearer, ItemStack stack, float partialTicks) {
+        T animatable = cast(stack.getItem());
+
+        if (!shouldRenderFirstPersonArm(animatable, stack, wearer)) return false;
+
+        List<ArmorSegment> segments = getFirstPersonSegments(animatable, stack, wearer);
+
+        if (segments == null) throw new IllegalStateException("First-person armor segments cannot be null");
+        if (segments.isEmpty()) return false;
+
+        prepareForRender(wearer, stack, ArmorRenderSlot.CHEST.armorSlot());
+        int firstPersonColor = multiplyColors(
+            getFirstPersonRenderColor(animatable, stack, wearer, partialTicks),
+            ((ItemArmor) stack.getItem()).getColor(stack));
+
+        this.firstPersonSegments = Collections.unmodifiableList(new ArrayList<>(segments));
+        this.renderColorOverride = firstPersonColor;
+        this.limbSwing = 0;
+        this.limbSwingAmount = 0;
+        this.ageInTicks = wearer.ticksExisted + partialTicks;
+        this.netHeadYaw = 0;
+        this.headPitch = 0;
+        this.onGround = 0;
+        this.isSneak = false;
+        this.isRiding = false;
+        this.isChild = false;
+        this.heldItemLeft = 0;
+        this.heldItemRight = 0;
+        this.aimedBow = false;
+        setRotationAngles(0, 0, 0, 0, 0, 1 / 16f, wearer);
+
+        int packedLight = wearer.worldObj.getLightBrightnessForSkyBlocks(
+            (int) Math.floor(wearer.posX),
+            (int) Math.floor(wearer.posY),
+            (int) Math.floor(wearer.posZ),
+            0);
+        int color = this.renderColorOverride;
+        GlStateSnapshot state = GlStateSnapshot.capture();
+        boolean matrixPushed = false;
+
+        try {
+            OpenGlHelper.setLightmapTextureCoords(
+                OpenGlHelper.lightmapTexUnit,
+                packedLight & 0xFFFF,
+                packedLight >>> 16 & 0xFFFF);
+            OpenGlHelper.setActiveTexture(OpenGlHelper.defaultTexUnit);
+            Minecraft.getMinecraft().renderEngine.bindTexture(this.model.getTextureResource(animatable));
+            GL11.glMatrixMode(GL11.GL_MODELVIEW);
+            GL11.glPushMatrix();
+            matrixPushed = true;
+            applyFirstPersonTransform(animatable, stack, wearer, partialTicks);
+            applyArmorRootTransform(false);
+            GeoRenderer.super.render(
+                animatable,
+                getInstanceId(stack),
+                this.ageInTicks,
+                partialTicks,
+                createMolangContext(wearer, partialTicks),
+                channel(color, 16),
+                channel(color, 8),
+                channel(color, 0),
+                channel(color, 24));
+
+            if (stack.isItemEnchanted()) renderFirstPersonGlint();
+        } finally {
+            this.firstPersonSegments = null;
+            this.renderColorOverride = null;
+
+            if (matrixPushed) {
+                GL11.glMatrixMode(GL11.GL_MODELVIEW);
+                GL11.glPopMatrix();
+            }
+
+            state.restore();
+        }
+
+        return true;
+    }
+
+    private void applyArmorRootTransform(boolean applyChild) {
+        if (applyChild) applyChildTransform();
+
+        GL11.glTranslatef(0, MODEL_OFFSET, 0);
+        GL11.glScalef(-this.scaleWidth, -this.scaleHeight, this.scaleWidth);
+        GL11.glTranslatef(0, 0.01f, 0);
+    }
+
+    private void renderFirstPersonGlint() {
+        Minecraft.getMinecraft().renderEngine.bindTexture(ENCHANTED_ITEM_GLINT);
+        GL11.glEnable(GL11.GL_BLEND);
+        GL11.glDisable(GL11.GL_LIGHTING);
+        GL11.glDepthFunc(GL11.GL_EQUAL);
+        GL11.glDepthMask(false);
+        GL11.glBlendFunc(GL11.GL_SRC_COLOR, GL11.GL_ONE);
+
+        for (int pass = 0; pass < 2; pass++) {
+            GL11.glMatrixMode(GL11.GL_TEXTURE);
+            GL11.glPushMatrix();
+
+            try {
+                GL11.glLoadIdentity();
+                GL11.glScalef(1 / 3f, 1 / 3f, 1 / 3f);
+                GL11.glRotatef(30 - pass * 60, 0, 0, 1);
+                GL11.glTranslatef(0, this.ageInTicks * (0.001f + pass * 0.003f) * 20, 0);
+                GL11.glMatrixMode(GL11.GL_MODELVIEW);
+                renderModelGeometry(this.activePose, 0.38f, 0.19f, 0.608f, 1);
+            } finally {
+                GL11.glMatrixMode(GL11.GL_TEXTURE);
+                GL11.glPopMatrix();
+                GL11.glMatrixMode(GL11.GL_MODELVIEW);
+            }
+        }
+    }
+
+    private List<ArmorSegment> getCurrentSegments() {
+        return this.firstPersonSegments == null ? getSegmentsForSlot(this.currentSlot) : this.firstPersonSegments;
+    }
+
+    private boolean isFirstPersonRender() {
+        return this.firstPersonSegments != null;
+    }
+
+    private static int multiplyColors(int color, int armorColor) {
+        if (armorColor < 0) return color;
+
+        int red = (color >> 16 & 255) * (armorColor >> 16 & 255) / 255;
+        int green = (color >> 8 & 255) * (armorColor >> 8 & 255) / 255;
+        int blue = (color & 255) * (armorColor & 255) / 255;
+
+        return color & 0xFF000000 | red << 16 | green << 8 | blue;
     }
 
     private float[] multiplyCurrentColor(int color) {

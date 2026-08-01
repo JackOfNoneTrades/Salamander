@@ -3,10 +3,12 @@ package com.geckolib.renderer;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 
 import java.util.Arrays;
 
 import net.minecraft.item.ItemArmor;
+import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 
 import org.junit.Test;
@@ -48,6 +50,17 @@ public class GeoArmorRendererTest {
 
         assertSame(renderer, GeoArmorRenderer.getArmorRenderer(first));
         assertNull(GeoArmorRenderer.getArmorRenderer(second));
+    }
+
+    @Test
+    public void defaultsFirstPersonPassToTheVanillaRightArm() {
+        TestArmor armor = new TestArmor();
+        GeoArmorRenderer<TestArmor> renderer = new GeoArmorRenderer<>(new TestArmorModel());
+
+        assertEquals(
+            Arrays.asList(ArmorSegment.RIGHT_ARM),
+            renderer.getFirstPersonSegments(armor, new ItemStack(armor), null));
+        assertTrue(renderer.shouldRenderFirstPersonArm(armor, new ItemStack(armor), null));
     }
 
     private static final class TestArmor extends ItemArmor implements GeoItem {
