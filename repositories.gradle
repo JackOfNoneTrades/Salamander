@@ -1,0 +1,12 @@
+// Add any additional repositories for your dependencies here.
+
+repositories {
+    maven {
+        name = "Fent Maven"
+        url "https://maven.fentanylsolutions.org/releases"
+    }
+    maven {
+        name = "FalsePattern Releases"
+        url "https://mvn.falsepattern.com/releases"
+    }
+}
