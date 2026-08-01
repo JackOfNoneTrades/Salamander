@@ -1,17 +1,21 @@
 # Salamander
 
-An animation library for Minecraft 1.7.10, based on GeckoLib 5.
+![logo](images/logo_small.png)
+
+
+1.7.10 Minecraft backport of [Geckolib](https://github.com/bernie-g/geckolib) (3, 4, 5), and model-related portions of [Citadel](https://github.com/AlexModGuy/Citadel).
 
 <!--
-[![hub](images/badges/github.png)](https://github.com/JackOfNoneTrades/Salamander/releases)
+
 [![curse](images/badges/curse.png)](https://www.curseforge.com/minecraft/mc-mods/salamander)
 [![modrinth](images/badges/modrinth.png)](https://modrinth.com/mod/salamander)
 [![67](images/badges/67.png)](https://67.fentanylsolutions.org/mod/salamander)
-[![maven](images/badges/maven.png)](https://maven.fentanylsolutions.org/#/releases/org/fentanylsolutions/salamander/Salamander)
 -->
 
-![forge](images/badges/forge.png)
+[![hub](images/badges/github.png)](https://github.com/JackOfNoneTrades/Salamander/releases)
+[![maven](images/badges/maven.png)](https://maven.fentanylsolutions.org/#/releases/org/fentanylsolutions/salamander/Salamander)
 [![cord](images/badges/cord.png)](https://discord.gg/xAWCqGrguG)
+![forge](images/badges/forge.png)
 
 ## Dependencies
 
@@ -25,8 +29,8 @@ An animation library for Minecraft 1.7.10, based on GeckoLib 5.
 ## Credits
 
 * The [GeckoLib](https://github.com/bernie-g/geckolib) contributors
-* Citadel compatibility code is derived from [Citadel](https://github.com/AlexModGuy/Citadel) and remains LGPLv3
-* The [GTNewHorizons](https://github.com/GTNewHorizons) community and build tooling
+* Citadel compatibility code is derived from [Citadel](https://github.com/AlexModGuy/Citadel) and is licensed under LGPLv3
+* The [GTNewHorizons](https://github.com/GTNewHorizons) tooling
 
 ## License
 
@@ -39,4 +43,4 @@ An animation library for Minecraft 1.7.10, based on GeckoLib 5.
 
 <br>
 
-![license](images/license_small.svg)
+![license](images/license_small.png)
