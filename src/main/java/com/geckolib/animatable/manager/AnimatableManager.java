@@ -59,6 +59,22 @@ public final class AnimatableManager<T extends GeoAnimatable> {
         return controller != null && controller.triggerAnimation(animationName);
     }
 
+    public boolean stopTriggeredAnimation(String animationName) {
+        for (AnimationController<T> controller : this.animationControllers.values()) {
+            if ((animationName == null || controller.isTriggeredAnimation(animationName))
+                && controller.stopTriggeredAnimation()) return true;
+        }
+
+        return false;
+    }
+
+    public boolean stopTriggeredAnimation(String controllerName, String animationName) {
+        AnimationController<T> controller = this.animationControllers.get(controllerName);
+
+        return controller != null && (animationName == null || controller.isTriggeredAnimation(animationName))
+            && controller.stopTriggeredAnimation();
+    }
+
     public static final class ControllerRegistrar {
 
         private final List<AnimationController<? extends GeoAnimatable>> controllers = new ArrayList<>();

@@ -1,0 +1,95 @@
+package com.geckolib.network.packet.entity;
+
+import org.fentanylsolutions.salamander.Salamander;
+
+import com.geckolib.network.GeckoLibNetwork;
+
+import cpw.mods.fml.common.network.ByteBufUtils;
+import cpw.mods.fml.common.network.simpleimpl.IMessage;
+import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
+import cpw.mods.fml.common.network.simpleimpl.MessageContext;
+import io.netty.buffer.ByteBuf;
+
+/** Stops one registered triggered animation on a client-side entity. */
+public final class StopTriggeredEntityAnimPacket implements IMessage {
+
+    private static final int MAX_NAME_LENGTH = 256;
+
+    private int protocolVersion;
+    private int entityId;
+    private String controllerName;
+    private String animationName;
+
+    @SuppressWarnings("unused")
+    public StopTriggeredEntityAnimPacket() {}
+
+    public StopTriggeredEntityAnimPacket(int entityId, String controllerName, String animationName) {
+        this.protocolVersion = GeckoLibNetwork.PROTOCOL_VERSION;
+        this.entityId = entityId;
+        this.controllerName = controllerName;
+        this.animationName = animationName;
+    }
+
+    @Override
+    public void fromBytes(ByteBuf buffer) {
+        this.protocolVersion = buffer.readInt();
+        this.entityId = buffer.readInt();
+        this.controllerName = readNullableString(buffer);
+        this.animationName = readNullableString(buffer);
+    }
+
+    @Override
+    public void toBytes(ByteBuf buffer) {
+        buffer.writeInt(this.protocolVersion);
+        buffer.writeInt(this.entityId);
+        writeNullableString(buffer, this.controllerName);
+        writeNullableString(buffer, this.animationName);
+    }
+
+    public int entityId() {
+        return this.entityId;
+    }
+
+    public String controllerName() {
+        return this.controllerName;
+    }
+
+    public String animationName() {
+        return this.animationName;
+    }
+
+    public boolean isValid() {
+        return this.protocolVersion == GeckoLibNetwork.PROTOCOL_VERSION && this.entityId >= 0
+            && isValidNullableName(this.controllerName)
+            && isValidNullableName(this.animationName);
+    }
+
+    private static String readNullableString(ByteBuf buffer) {
+        return buffer.readBoolean() ? ByteBufUtils.readUTF8String(buffer) : null;
+    }
+
+    private static void writeNullableString(ByteBuf buffer, String value) {
+        buffer.writeBoolean(value != null);
+
+        if (value != null) ByteBufUtils.writeUTF8String(buffer, value);
+    }
+
+    private static boolean isValidNullableName(String name) {
+        return name == null || !name.isEmpty() && name.length() <= MAX_NAME_LENGTH;
+    }
+
+    public static final class Handler implements IMessageHandler<StopTriggeredEntityAnimPacket, IMessage> {
+
+        @Override
+        public IMessage onMessage(StopTriggeredEntityAnimPacket message, MessageContext context) {
+            if (message.isValid()) {
+                Salamander.proxy.handleStopTriggeredEntityAnimation(
+                    message.entityId(),
+                    message.controllerName(),
+                    message.animationName());
+            }
+
+            return null;
+        }
+    }
+}

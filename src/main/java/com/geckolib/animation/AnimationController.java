@@ -100,6 +100,12 @@ public class AnimationController<T extends GeoAnimatable> {
         return this.playingTriggeredAnimation && this.animationPoint != null;
     }
 
+    public boolean isTriggeredAnimation(String animationName) {
+        RawAnimation animation = this.triggerableAnimations.get(animationName);
+
+        return this.playingTriggeredAnimation && animation != null && animation.equals(this.currentRawAnimation);
+    }
+
     public boolean hasAnimationFinished() {
         return this.finished;
     }

@@ -104,6 +104,26 @@ public class AnimationControllerTest {
                 .isEmpty());
     }
 
+    @Test
+    public void triggersAndStopsOnlyMatchingRegisteredAnimations() {
+        TriggerAnimatable animatable = new TriggerAnimatable();
+        AnimatableManager<TriggerAnimatable> manager = animatable.cache.getManagerForId(3);
+
+        assertFalse(manager.tryTriggerAnimation("missing"));
+        assertTrue(manager.tryTriggerAnimation("action", "attack"));
+        assertTrue(animatable.actionController.isTriggeredAnimation("attack"));
+        assertFalse(animatable.actionController.isTriggeredAnimation("roar"));
+        assertFalse(manager.stopTriggeredAnimation("action", "roar"));
+        assertEquals(WALK, animatable.actionController.getCurrentRawAnimation());
+        assertTrue(manager.stopTriggeredAnimation("action", "attack"));
+        assertFalse(animatable.actionController.isTriggeredAnimation("attack"));
+
+        assertTrue(manager.tryTriggerAnimation("roar"));
+        assertTrue(animatable.voiceController.isTriggeredAnimation("roar"));
+        assertTrue(manager.stopTriggeredAnimation((String) null));
+        assertFalse(animatable.voiceController.isTriggeredAnimation("roar"));
+    }
+
     private BakedAnimations loadFixture() throws Exception {
         try (Reader reader = new InputStreamReader(
             getClass().getResourceAsStream("/animations/headless.animation.json"),
@@ -141,6 +161,32 @@ public class AnimationControllerTest {
         @Override
         public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
             controllers.add(this.controller);
+        }
+
+        @Override
+        public AnimatableInstanceCache getAnimatableInstanceCache() {
+            return this.cache;
+        }
+    }
+
+    private static final class TriggerAnimatable implements GeoAnimatable {
+
+        private final AnimationController<TriggerAnimatable> actionController = new AnimationController<>(
+            "action",
+            test -> com.geckolib.animation.object.PlayState.STOP);
+        private final AnimationController<TriggerAnimatable> voiceController = new AnimationController<>(
+            "voice",
+            test -> com.geckolib.animation.object.PlayState.STOP);
+        private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
+
+        private TriggerAnimatable() {
+            this.actionController.triggerableAnim("attack", WALK);
+            this.voiceController.triggerableAnim("roar", WALK);
+        }
+
+        @Override
+        public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
+            controllers.add(this.actionController, this.voiceController);
         }
 
         @Override
