@@ -1,5 +1,6 @@
 package com.geckolib.animation;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -20,8 +21,7 @@ import com.geckolib.loading.math.MolangContext;
  * Headless GeckoLib animation controller.
  *
  * <p>
- * This owns deterministic timeline state. Client transition blending will use the same state once the model renderer
- * is available.
+ * This owns deterministic timeline and transition state without depending on client rendering classes.
  */
 public class AnimationController<T extends GeoAnimatable> {
 
@@ -31,6 +31,7 @@ public class AnimationController<T extends GeoAnimatable> {
 
     private int transitionTicks;
     private double animationSpeed = 1;
+    private boolean additiveAnimations;
     private boolean handlesTriggeredAnimations;
     private EasingType easingOverride;
     private PlayState playState = PlayState.STOP;
@@ -42,6 +43,12 @@ public class AnimationController<T extends GeoAnimatable> {
     private double lastAnimatableAge = Double.NaN;
     private boolean playingTriggeredAnimation;
     private boolean finished;
+    private boolean transitioning;
+    private boolean resetting;
+    private boolean transitionStartedThisTick;
+    private double transitionElapsedTicks;
+    private Map<String, BoneSnapshot> transitionStartPose = Collections.emptyMap();
+    private Map<String, BoneSnapshot> lastEvaluatedPose = Collections.emptyMap();
 
     public AnimationController(AnimationStateHandler<T> stateHandler) {
         this("Default", 0, stateHandler);
@@ -53,7 +60,7 @@ public class AnimationController<T extends GeoAnimatable> {
 
     public AnimationController(String name, int transitionTicks, AnimationStateHandler<T> stateHandler) {
         this.name = name;
-        this.transitionTicks = transitionTicks;
+        this.transitionTicks = Math.max(0, transitionTicks);
         this.stateHandler = stateHandler;
     }
 
@@ -98,7 +105,15 @@ public class AnimationController<T extends GeoAnimatable> {
     }
 
     public boolean isAnimatingBones() {
-        return this.animationPoint != null;
+        return this.animationPoint != null || this.resetting;
+    }
+
+    public boolean isTransitioning() {
+        return this.transitioning;
+    }
+
+    public boolean isAdditive() {
+        return this.additiveAnimations;
     }
 
     public AnimationController<T> setAnimationSpeed(double speed) {
@@ -108,7 +123,13 @@ public class AnimationController<T extends GeoAnimatable> {
     }
 
     public AnimationController<T> setTransitionTicks(int ticks) {
-        this.transitionTicks = ticks;
+        this.transitionTicks = Math.max(0, ticks);
+
+        return this;
+    }
+
+    public AnimationController<T> additiveAnimations() {
+        this.additiveAnimations = true;
 
         return this;
     }
@@ -137,7 +158,9 @@ public class AnimationController<T extends GeoAnimatable> {
 
         if (rawAnimation.equals(this.currentRawAnimation)) return;
 
+        beginTransition(this.lastEvaluatedPose, false);
         this.currentRawAnimation = rawAnimation;
+        this.initializedRawAnimation = null;
         this.playingTriggeredAnimation = false;
         this.finished = false;
     }
@@ -147,6 +170,7 @@ public class AnimationController<T extends GeoAnimatable> {
 
         if (animation == null) return false;
 
+        beginTransition(this.lastEvaluatedPose, false);
         this.currentRawAnimation = animation;
         this.initializedRawAnimation = null;
         this.playingTriggeredAnimation = true;
@@ -181,6 +205,12 @@ public class AnimationController<T extends GeoAnimatable> {
         this.stageTime = 0;
         this.playingTriggeredAnimation = false;
         this.finished = false;
+        this.transitioning = false;
+        this.resetting = false;
+        this.transitionStartedThisTick = false;
+        this.transitionElapsedTicks = 0;
+        this.transitionStartPose = Collections.emptyMap();
+        this.lastEvaluatedPose = Collections.emptyMap();
     }
 
     /** Advance this controller using an animatable age measured in Minecraft ticks. */
@@ -194,15 +224,35 @@ public class AnimationController<T extends GeoAnimatable> {
         }
 
         if (this.playState == PlayState.STOP) {
-            this.initializedRawAnimation = null;
-            this.animationPoint = null;
-            this.stageTime = 0;
-            this.finished = false;
+            if (!this.resetting && this.animationPoint != null) {
+                Map<String, BoneSnapshot> resetPose = this.lastEvaluatedPose;
+
+                if (resetPose.isEmpty()) {
+                    ControllerState state = new ControllerState(context)
+                        .setAnimationTime(this.animationPoint.animTime());
+
+                    resetPose = AnimationProcessor.evaluate(this.animationPoint, state);
+                }
+
+                this.lastEvaluatedPose = copyPose(resetPose);
+                beginTransition(resetPose, true);
+                this.currentRawAnimation = null;
+                this.initializedRawAnimation = null;
+                this.animationPoint = null;
+                this.stageTime = 0;
+                this.finished = false;
+            }
+
+            advanceTransition(tickDelta);
 
             return null;
         }
 
-        if (this.currentRawAnimation == null) return null;
+        if (this.currentRawAnimation == null) {
+            advanceTransition(tickDelta);
+
+            return null;
+        }
 
         if (this.initializedRawAnimation != this.currentRawAnimation) {
             this.initializedRawAnimation = this.currentRawAnimation;
@@ -215,17 +265,31 @@ public class AnimationController<T extends GeoAnimatable> {
         if (this.animationPoint == null) return null;
 
         if (this.playState != PlayState.PAUSE && !this.finished)
-            advanceTimeline(tickDelta / 20d * this.animationSpeed, animations);
+            advanceTimeline(tickDelta / 20d * this.animationSpeed, animations, context);
+
+        advanceTransition(tickDelta);
 
         return this.animationPoint;
     }
 
     public Map<String, BoneSnapshot> evaluateCurrentPose(MolangContext molangContext) {
-        if (this.animationPoint == null) return java.util.Collections.emptyMap();
+        Map<String, BoneSnapshot> targetPose;
 
-        ControllerState state = new ControllerState(molangContext).setAnimationTime(this.animationPoint.animTime());
+        if (this.resetting || this.animationPoint == null) {
+            targetPose = Collections.emptyMap();
+        } else {
+            ControllerState state = new ControllerState(molangContext).setAnimationTime(this.animationPoint.animTime());
 
-        return AnimationProcessor.evaluate(this.animationPoint, state);
+            targetPose = AnimationProcessor.evaluate(this.animationPoint, state);
+        }
+
+        Map<String, BoneSnapshot> result = this.transitioning
+            ? interpolatePose(this.transitionStartPose, targetPose, getTransitionProgress())
+            : copyPose(targetPose);
+
+        this.lastEvaluatedPose = copyPose(result);
+
+        return Collections.unmodifiableMap(result);
     }
 
     private double calculateTickDelta(double animatableAge) {
@@ -261,7 +325,7 @@ public class AnimationController<T extends GeoAnimatable> {
         this.finished = true;
     }
 
-    private void advanceTimeline(double timeAdvanced, BakedAnimations animations) {
+    private void advanceTimeline(double timeAdvanced, BakedAnimations animations, MolangContext molangContext) {
         if (timeAdvanced == 0 || this.animationPoint == null) return;
 
         this.stageTime += timeAdvanced;
@@ -302,8 +366,120 @@ public class AnimationController<T extends GeoAnimatable> {
                 return;
             }
 
+            ControllerState state = new ControllerState(molangContext).setAnimationTime(length);
+
+            beginTransition(AnimationProcessor.evaluate(this.animationPoint.createNext(length), state), false);
             initializeCurrentStage(animations);
         }
+    }
+
+    private void beginTransition(Map<String, BoneSnapshot> startPose, boolean resetting) {
+        this.resetting = resetting;
+
+        if (this.transitionTicks == 0) {
+            this.transitioning = false;
+            this.resetting = false;
+            this.transitionStartedThisTick = false;
+            this.transitionElapsedTicks = 0;
+            this.transitionStartPose = Collections.emptyMap();
+
+            if (resetting) this.lastEvaluatedPose = Collections.emptyMap();
+
+            return;
+        }
+
+        this.transitioning = true;
+        this.transitionStartedThisTick = true;
+        this.transitionElapsedTicks = 0;
+        this.transitionStartPose = copyPose(startPose);
+    }
+
+    private void advanceTransition(double tickDelta) {
+        if (!this.transitioning) return;
+
+        if (this.transitionStartedThisTick) {
+            this.transitionStartedThisTick = false;
+            return;
+        }
+
+        this.transitionElapsedTicks = Math.min(this.transitionTicks, this.transitionElapsedTicks + tickDelta);
+
+        if (this.transitionElapsedTicks < this.transitionTicks) return;
+
+        this.transitioning = false;
+        this.transitionStartPose = Collections.emptyMap();
+
+        if (this.resetting) {
+            this.resetting = false;
+            this.lastEvaluatedPose = Collections.emptyMap();
+        }
+    }
+
+    private float getTransitionProgress() {
+        return this.transitionTicks == 0 ? 1 : (float) (this.transitionElapsedTicks / this.transitionTicks);
+    }
+
+    private static Map<String, BoneSnapshot> interpolatePose(Map<String, BoneSnapshot> start,
+        Map<String, BoneSnapshot> target, float progress) {
+        Map<String, BoneSnapshot> result = new LinkedHashMap<>();
+
+        for (String boneName : start.keySet()) {
+            result.put(boneName, interpolateSnapshot(start.get(boneName), target.get(boneName), progress));
+        }
+
+        for (String boneName : target.keySet()) {
+            if (!result.containsKey(boneName))
+                result.put(boneName, interpolateSnapshot(null, target.get(boneName), progress));
+        }
+
+        return result;
+    }
+
+    private static BoneSnapshot interpolateSnapshot(BoneSnapshot start, BoneSnapshot target, float progress) {
+        String boneName = start == null ? target.getBoneName() : start.getBoneName();
+        BoneSnapshot from = start == null ? BoneSnapshot.create(boneName) : start;
+        BoneSnapshot to = target == null ? BoneSnapshot.create(boneName) : target;
+
+        return BoneSnapshot.create(boneName)
+            .setScale(
+                lerp(from.getScaleX(), to.getScaleX(), progress),
+                lerp(from.getScaleY(), to.getScaleY(), progress),
+                lerp(from.getScaleZ(), to.getScaleZ(), progress))
+            .setRotation(
+                lerpRotation(from.getRotX(), to.getRotX(), progress),
+                lerpRotation(from.getRotY(), to.getRotY(), progress),
+                lerpRotation(from.getRotZ(), to.getRotZ(), progress))
+            .setTranslation(
+                lerp(from.getTranslateX(), to.getTranslateX(), progress),
+                lerp(from.getTranslateY(), to.getTranslateY(), progress),
+                lerp(from.getTranslateZ(), to.getTranslateZ(), progress))
+            .skipRender(progress < 0.5f ? from.isHidden() : to.isHidden())
+            .skipChildrenRender(progress < 0.5f ? from.areChildrenHidden() : to.areChildrenHidden());
+    }
+
+    private static float lerp(float start, float end, float progress) {
+        return start + (end - start) * progress;
+    }
+
+    private static float lerpRotation(float start, float end, float progress) {
+        float delta = (float) Math.atan2(Math.sin(end - start), Math.cos(end - start));
+
+        return start + delta * progress;
+    }
+
+    private static Map<String, BoneSnapshot> copyPose(Map<String, BoneSnapshot> pose) {
+        if (pose.isEmpty()) return Collections.emptyMap();
+
+        Map<String, BoneSnapshot> copy = new LinkedHashMap<>(pose.size());
+
+        for (Map.Entry<String, BoneSnapshot> entry : pose.entrySet()) {
+            copy.put(
+                entry.getKey(),
+                entry.getValue()
+                    .copy());
+        }
+
+        return copy;
     }
 
     private Animation resolveAnimation(RawAnimation.Stage stage, BakedAnimations animations) {

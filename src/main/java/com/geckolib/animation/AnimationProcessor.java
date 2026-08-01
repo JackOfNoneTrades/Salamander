@@ -4,20 +4,39 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import com.geckolib.animatable.GeoAnimatable;
+import com.geckolib.animatable.manager.AnimatableManager;
 import com.geckolib.animation.object.EasingType;
 import com.geckolib.animation.state.AnimationPoint;
 import com.geckolib.animation.state.BoneSnapshot;
 import com.geckolib.animation.state.ControllerState;
 import com.geckolib.animation.state.EasingState;
+import com.geckolib.animation.state.ModelPose;
 import com.geckolib.cache.animation.Animation;
+import com.geckolib.cache.animation.BakedAnimations;
 import com.geckolib.cache.animation.BoneAnimation;
 import com.geckolib.cache.animation.Keyframe;
+import com.geckolib.cache.model.BakedGeoModel;
 import com.geckolib.loading.math.MolangContext;
 
 /** CPU-only animation evaluation. Rendering is layered on these snapshots by the client module. */
 public final class AnimationProcessor {
 
     private AnimationProcessor() {}
+
+    public static <T extends GeoAnimatable> ModelPose createModelPose(T animatable, AnimatableManager<T> manager,
+        BakedAnimations animations, BakedGeoModel model, double animatableAge, MolangContext molangContext) {
+        MolangContext context = molangContext == null ? MolangContext.EMPTY : molangContext;
+        ModelPose pose = ModelPose.create(model);
+
+        for (AnimationController<T> controller : manager.getAnimationControllers()
+            .values()) {
+            controller.tick(animatable, manager, animations, animatableAge, context);
+            pose.apply(controller.evaluateCurrentPose(context), controller.isAdditive());
+        }
+
+        return pose;
+    }
 
     public static Map<String, BoneSnapshot> evaluate(Animation animation, double animationTime,
         MolangContext molangContext) {

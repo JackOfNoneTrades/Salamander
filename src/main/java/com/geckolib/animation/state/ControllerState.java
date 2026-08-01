@@ -10,8 +10,7 @@ import com.geckolib.loading.math.value.Variable;
  * Headless state used while evaluating an animation.
  *
  * <p>
- * The modern GeckoLib render-state fields will be added by the renderer milestone. Molang variables are already
- * scoped to this state so concurrent entity evaluations cannot affect each other.
+ * Molang variables are scoped to this state so concurrent entity evaluations cannot affect each other.
  */
 public final class ControllerState {
 

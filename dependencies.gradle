@@ -52,4 +52,5 @@ dependencies {
 
     // Test
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.joml:joml:1.10.8") // GTNHLib provides this in game through its dependency loader
 }

@@ -29,27 +29,46 @@ public final class BakedAnimationCache {
 
     public Animation getAnimation(ResourceLocation animationFile, ResourceLocation[] fallbackFiles,
         String animationName) {
-        ResourceLocation[] fallbacks = fallbackFiles == null ? new ResourceLocation[0] : fallbackFiles;
-        BakedAnimations animations = null;
+        BakedAnimations animations = getAnimations(animationFile, fallbackFiles);
 
-        for (int i = -1; i < fallbacks.length; i++) {
-            ResourceLocation path = i < 0 ? animationFile : fallbacks[i];
+        if (animations.isEmpty()) {
+            GeckoLibConstants.LOGGER.error("Unable to find animation file '{}'", animationFile);
 
-            animations = this.cache.get(path);
-
-            if (animations == null) animations = this.cache.get(GeckoLibResources.stripPrefixAndSuffix(path));
-
-            if (animations != null) {
-                Animation animation = animations.getAnimation(animationName);
-
-                if (animation != null) return animation;
-            }
+            return null;
         }
 
-        if (animations == null) GeckoLibConstants.LOGGER.error("Unable to find animation file '{}'", animationFile);
-        else GeckoLibConstants.LOGGER
+        Animation animation = animations.getAnimation(animationName);
+
+        if (animation == null) GeckoLibConstants.LOGGER
             .error("Unable to find animation '{}' in animation file '{}'", animationName, animationFile);
 
-        return null;
+        return animation;
+    }
+
+    public BakedAnimations getAnimations(ResourceLocation animationFile, ResourceLocation[] fallbackFiles) {
+        ResourceLocation[] fallbacks = fallbackFiles == null ? new ResourceLocation[0] : fallbackFiles;
+
+        if (fallbacks.length == 0) {
+            BakedAnimations animations = findAnimations(animationFile);
+
+            return animations == null ? BakedAnimations.empty() : animations;
+        }
+
+        Map<String, Animation> animations = new LinkedHashMap<>();
+
+        for (int i = fallbacks.length - 1; i >= -1; i--) {
+            ResourceLocation path = i < 0 ? animationFile : fallbacks[i];
+            BakedAnimations bakedAnimations = findAnimations(path);
+
+            if (bakedAnimations != null) animations.putAll(bakedAnimations.animations());
+        }
+
+        return animations.isEmpty() ? BakedAnimations.empty() : new BakedAnimations(animations);
+    }
+
+    private BakedAnimations findAnimations(ResourceLocation path) {
+        BakedAnimations animations = this.cache.get(path);
+
+        return animations == null ? this.cache.get(GeckoLibResources.stripPrefixAndSuffix(path)) : animations;
     }
 }

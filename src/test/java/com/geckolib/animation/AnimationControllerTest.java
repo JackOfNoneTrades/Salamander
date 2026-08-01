@@ -1,7 +1,9 @@
 package com.geckolib.animation;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 import java.io.InputStreamReader;
 import java.io.Reader;
@@ -53,6 +55,55 @@ public class AnimationControllerTest {
         assertEquals(0, animatable.controller.getCurrentAnimationTime(), EPSILON);
     }
 
+    @Test
+    public void transitionsIntoAndOutOfAnimationPose() throws Exception {
+        TransitionAnimatable animatable = new TransitionAnimatable();
+        AnimatableManager<TransitionAnimatable> manager = animatable.cache.getManagerForId(2);
+        BakedAnimations animations = loadFixture();
+
+        animatable.controller.tick(animatable, manager, animations, 0, MolangContext.EMPTY);
+        assertTrue(animatable.controller.isTransitioning());
+        assertEquals(
+            0,
+            animatable.controller.evaluateCurrentPose(MolangContext.EMPTY)
+                .get("body")
+                .getTranslateX(),
+            EPSILON);
+
+        animatable.controller.tick(animatable, manager, animations, 10, MolangContext.EMPTY);
+        assertFalse(animatable.controller.isTransitioning());
+        assertEquals(
+            1,
+            animatable.controller.evaluateCurrentPose(MolangContext.EMPTY)
+                .get("body")
+                .getTranslateX(),
+            EPSILON);
+
+        animatable.playing = false;
+        animatable.controller.tick(animatable, manager, animations, 10, MolangContext.EMPTY);
+        assertTrue(animatable.controller.isTransitioning());
+        assertEquals(
+            1,
+            animatable.controller.evaluateCurrentPose(MolangContext.EMPTY)
+                .get("body")
+                .getTranslateX(),
+            EPSILON);
+
+        animatable.controller.tick(animatable, manager, animations, 15, MolangContext.EMPTY);
+        assertEquals(
+            0.5,
+            animatable.controller.evaluateCurrentPose(MolangContext.EMPTY)
+                .get("body")
+                .getTranslateX(),
+            EPSILON);
+
+        animatable.controller.tick(animatable, manager, animations, 20, MolangContext.EMPTY);
+        assertFalse(animatable.controller.isTransitioning());
+        assertTrue(
+            animatable.controller.evaluateCurrentPose(MolangContext.EMPTY)
+                .isEmpty());
+    }
+
     private BakedAnimations loadFixture() throws Exception {
         try (Reader reader = new InputStreamReader(
             getClass().getResourceAsStream("/animations/headless.animation.json"),
@@ -65,6 +116,26 @@ public class AnimationControllerTest {
 
         private final AnimationController<TestAnimatable> controller = new AnimationController<>(
             test -> test.setAndContinue(WALK));
+        private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
+
+        @Override
+        public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
+            controllers.add(this.controller);
+        }
+
+        @Override
+        public AnimatableInstanceCache getAnimatableInstanceCache() {
+            return this.cache;
+        }
+    }
+
+    private static final class TransitionAnimatable implements GeoAnimatable {
+
+        private boolean playing = true;
+        private final AnimationController<TransitionAnimatable> controller = new AnimationController<>(
+            "transition",
+            10,
+            test -> this.playing ? test.setAndContinue(WALK) : com.geckolib.animation.object.PlayState.STOP);
         private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
 
         @Override
