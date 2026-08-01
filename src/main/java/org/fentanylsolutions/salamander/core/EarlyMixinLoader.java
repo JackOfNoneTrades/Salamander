@@ -1,6 +1,6 @@
 package org.fentanylsolutions.salamander.core;
 
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -9,6 +9,7 @@ import org.fentanylsolutions.salamander.Salamander;
 
 import com.gtnewhorizon.gtnhmixins.IEarlyMixinLoader;
 
+import cpw.mods.fml.relauncher.FMLLaunchHandler;
 import cpw.mods.fml.relauncher.IFMLLoadingPlugin;
 
 @SuppressWarnings("unused")
@@ -22,7 +23,12 @@ public class EarlyMixinLoader implements IEarlyMixinLoader, IFMLLoadingPlugin {
 
     @Override
     public List<String> getMixins(Set<String> loadedCoreMods) {
-        return Collections.emptyList();
+        List<String> mixins = new ArrayList<>();
+
+        if (FMLLaunchHandler.side()
+            .isClient()) mixins.add("minecraft.client.resources.AccessorAbstractResourcePack");
+
+        return mixins;
     }
 
     @Override

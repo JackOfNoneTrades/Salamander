@@ -6,6 +6,8 @@ import com.geckolib.animatable.instance.InstancedAnimatableInstanceCache;
 import com.geckolib.animatable.instance.SingletonAnimatableInstanceCache;
 import com.geckolib.animation.object.EasingType;
 import com.geckolib.animation.object.LoopType;
+import com.geckolib.cache.GeckoLibResources;
+import com.geckolib.loading.loader.GeckoLibLoader;
 import com.geckolib.loading.math.MathParser;
 import com.geckolib.loading.math.function.MathFunction;
 
@@ -39,5 +41,9 @@ public final class GeckoLibUtil {
 
     public static void addCustomMathFunction(String name, MathFunction.Factory<?> factory) {
         MathParser.registerFunction(name, factory);
+    }
+
+    public static void addResourceLoader(GeckoLibLoader.Predicate predicate, GeckoLibLoader loader) {
+        GeckoLibResources.addLoader(predicate, loader);
     }
 }

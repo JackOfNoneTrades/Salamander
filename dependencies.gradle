@@ -42,6 +42,7 @@ dependencies {
     runtimeOnlyNonPublishable(rfg.deobf("curse.maven:catalogue-vintage-1465746:8384975")) // 1.0.8-1.7.10
     runtimeOnlyNonPublishable("org.fentanylsolutions.wawelauth:WawelAuth:1.0.4:dev")
     runtimeOnlyNonPublishable("org.fentanylsolutions.fentlib:FentLib:0.0.53:dev") // WawelAuth dev runtime
+    runtimeOnlyNonPublishable("com.github.GTNewHorizons:ModularUI2:2.3.80-1.7.10:dev") // WawelAuth UI
 
     // Compile + runtime
     api("com.github.GTNewHorizons:GTNHLib:0.11.30:dev")

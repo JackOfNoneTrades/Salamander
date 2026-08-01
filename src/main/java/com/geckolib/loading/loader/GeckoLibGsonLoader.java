@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+import net.minecraft.util.ResourceLocation;
+
 import com.geckolib.animation.object.EasingType;
 import com.geckolib.animation.object.LoopType;
 import com.geckolib.animation.state.AnimationPoint;
@@ -20,6 +22,7 @@ import com.geckolib.cache.animation.KeyframeStack;
 import com.geckolib.cache.animation.keyframeevent.CustomInstructionKeyframeData;
 import com.geckolib.cache.animation.keyframeevent.ParticleKeyframeData;
 import com.geckolib.cache.animation.keyframeevent.SoundKeyframeData;
+import com.geckolib.cache.model.BakedGeoModel;
 import com.geckolib.loading.definition.animation.DoubleOrString;
 import com.geckolib.loading.math.MathParser;
 import com.geckolib.loading.math.MathValue;
@@ -32,13 +35,44 @@ import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
 
 /** Gson-backed GeckoLib 5 animation loader with 1.7.10-safe reader entry points. */
-public final class GeckoLibGsonLoader {
+public final class GeckoLibGsonLoader implements GeckoLibLoader {
 
     private static final double KEYFRAME_EPSILON = 1.0E-5;
     private static final double DEG_TO_RAD = Math.PI / 180d;
 
+    @Override
+    public String[] supportedExtensions() {
+        return new String[] { "json" };
+    }
+
+    @Override
+    public BakedGeoModel loadModel(ResourceLocation resourcePath, Reader reader) {
+        JsonElement json = new JsonParser().parse(reader);
+
+        if (!json.isJsonObject()) throw new JsonParseException("Geometry file root must be a JSON object");
+
+        return loadModel(resourcePath, json.getAsJsonObject());
+    }
+
+    public BakedGeoModel loadModel(ResourceLocation resourcePath, JsonObject root) {
+        if (resourcePath.getResourcePath()
+            .endsWith(".animation.json"))
+            throw new JsonParseException("Found animation file in models folder: " + resourcePath);
+
+        return GeometryParser.parse(resourcePath, root);
+    }
+
     public BakedAnimations loadAnimations(Reader reader) {
         return loadAnimations(reader, MathParser.createWithDeduplication());
+    }
+
+    @Override
+    public BakedAnimations loadAnimations(ResourceLocation resourcePath, Reader reader, MathParser mathParser) {
+        if (resourcePath.getResourcePath()
+            .endsWith(".geo.json"))
+            throw new JsonParseException("Found geometry file in animations folder: " + resourcePath);
+
+        return loadAnimations(reader, mathParser);
     }
 
     public BakedAnimations loadAnimations(Reader reader, MathParser mathParser) {
