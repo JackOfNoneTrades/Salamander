@@ -25,11 +25,12 @@ An animation library for Minecraft 1.7.10, based on GeckoLib 5.
 ## Credits
 
 * The [GeckoLib](https://github.com/bernie-g/geckolib) contributors
+* Citadel compatibility code is derived from [Citadel](https://github.com/AlexModGuy/Citadel) and remains LGPLv3
 * The [GTNewHorizons](https://github.com/GTNewHorizons) community and build tooling
 
 ## License
 
-`MIT`
+`MIT`, except the Citadel-derived compatibility code (`LGPLv3`)
 
 ## Buy me creatine
 

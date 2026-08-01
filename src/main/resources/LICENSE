@@ -1,3 +1,7 @@
+Salamander is MIT licensed except for files marked SPDX-License-Identifier:
+LGPL-3.0-only. Those Citadel-derived compatibility files are licensed under
+the GNU Lesser General Public License v3.0 in LICENSE-CITADEL.
+
 MIT License
 
 Copyright (c) 2026 GeckoLib

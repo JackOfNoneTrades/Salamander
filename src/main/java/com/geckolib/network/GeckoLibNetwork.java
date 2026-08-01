@@ -16,6 +16,7 @@ import com.geckolib.network.packet.blockentity.BlockEntityAnimTriggerPacket;
 import com.geckolib.network.packet.blockentity.StatelessBlockEntityPlayAnimPacket;
 import com.geckolib.network.packet.blockentity.StatelessBlockEntityStopAnimPacket;
 import com.geckolib.network.packet.blockentity.StopTriggeredBlockEntityAnimPacket;
+import com.geckolib.network.packet.entity.CitadelAnimationPacket;
 import com.geckolib.network.packet.entity.EntityAnimTriggerPacket;
 import com.geckolib.network.packet.entity.StatelessEntityPlayAnimPacket;
 import com.geckolib.network.packet.entity.StatelessEntityStopAnimPacket;
@@ -47,6 +48,7 @@ public final class GeckoLibNetwork {
     private static final int STATELESS_SINGLETON_STOP_PACKET_ID = 9;
     private static final int STATELESS_BLOCK_ENTITY_PLAY_PACKET_ID = 10;
     private static final int STATELESS_BLOCK_ENTITY_STOP_PACKET_ID = 11;
+    private static final int CITADEL_ANIMATION_PACKET_ID = 12;
     private static final SimpleNetworkWrapper CHANNEL = NetworkRegistry.INSTANCE.newSimpleChannel(Salamander.MODID);
 
     private static boolean initialized;
@@ -116,6 +118,11 @@ public final class GeckoLibNetwork {
             StatelessBlockEntityStopAnimPacket.Handler.class,
             StatelessBlockEntityStopAnimPacket.class,
             STATELESS_BLOCK_ENTITY_STOP_PACKET_ID,
+            Side.CLIENT);
+        CHANNEL.registerMessage(
+            CitadelAnimationPacket.Handler.class,
+            CitadelAnimationPacket.class,
+            CITADEL_ANIMATION_PACKET_ID,
             Side.CLIENT);
     }
 
@@ -294,6 +301,14 @@ public final class GeckoLibNetwork {
             throw new IllegalArgumentException("Invalid stateless block entity animation stop request");
 
         sendToTrackingChunk(tileEntity, message);
+    }
+
+    public static void syncCitadelAnimation(Entity entity, int animationIndex) {
+        CitadelAnimationPacket message = new CitadelAnimationPacket(entity.getEntityId(), animationIndex);
+
+        if (!message.isValid()) throw new IllegalArgumentException("Invalid Citadel entity animation");
+
+        sendToTrackingAndSelf(entity, message);
     }
 
     private static void sendToTrackingAndSelf(Entity entity, IMessage message) {

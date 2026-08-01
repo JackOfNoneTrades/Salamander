@@ -18,6 +18,8 @@ import com.geckolib.animation.RawAnimation;
 import com.geckolib.cache.SyncedSingletonAnimatableCache;
 import com.geckolib.client.resource.GeckoLibResourceReloadListener;
 import com.geckolib.renderer.GeoReplacedEntityRenderer;
+import com.github.alexthe666.citadel.animation.Animation;
+import com.github.alexthe666.citadel.animation.IAnimatedEntity;
 
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 
@@ -195,6 +197,26 @@ public class ClientProxy extends CommonProxy {
 
                 if (tileEntity instanceof StatelessGeoBlockEntity) ((StatelessGeoBlockEntity) tileEntity)
                     .handleClientAnimationStop((GeoAnimatable) tileEntity, 0, animation);
+            });
+    }
+
+    @Override
+    public void handleCitadelAnimation(int entityId, int animationIndex) {
+        Minecraft.getMinecraft()
+            .func_152344_a(() -> {
+                Entity entity = getClientEntity(entityId);
+
+                if (!(entity instanceof IAnimatedEntity)) return;
+
+                IAnimatedEntity animatedEntity = (IAnimatedEntity) entity;
+                Animation[] animations = animatedEntity.getAnimations();
+
+                if (animationIndex == -1) animatedEntity.setAnimation(IAnimatedEntity.NO_ANIMATION);
+                else if (animations != null && animationIndex < animations.length) {
+                    animatedEntity.setAnimation(animations[animationIndex]);
+                } else return;
+
+                animatedEntity.setAnimationTick(0);
             });
     }
 

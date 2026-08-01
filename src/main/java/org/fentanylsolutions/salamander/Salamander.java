@@ -13,7 +13,7 @@ import cpw.mods.fml.common.event.FMLPreInitializationEvent;
     name = Salamander.MODNAME,
     acceptedMinecraftVersions = "[1.7.10]",
     dependencies = "required-after:gtnhlib@[0.11.30,)",
-    customProperties = { @Mod.CustomProperty(k = "license", v = "MIT"),
+    customProperties = { @Mod.CustomProperty(k = "license", v = "MIT AND LGPL-3.0-only"),
         @Mod.CustomProperty(k = "issueTrackerUrl", v = "https://github.com/JackOfNoneTrades/Salamander/issues") })
 public class Salamander {
 

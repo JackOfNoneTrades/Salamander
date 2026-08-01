@@ -40,4 +40,6 @@ public class CommonProxy {
     public void handleStatelessBlockEntityAnimationPlay(int x, int y, int z, RawAnimation animation) {}
 
     public void handleStatelessBlockEntityAnimationStop(int x, int y, int z, String animation) {}
+
+    public void handleCitadelAnimation(int entityId, int animationIndex) {}
 }
