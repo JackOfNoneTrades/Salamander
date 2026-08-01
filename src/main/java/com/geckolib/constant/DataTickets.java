@@ -24,6 +24,7 @@ public final class DataTickets {
     public static final DataTicket<Boolean> IS_CHILD = DataTicket.create("is_child", Boolean.class);
     public static final DataTicket<Boolean> IS_SITTING = DataTicket.create("is_sitting", Boolean.class);
     public static final DataTicket<Integer> RENDER_COLOR = DataTicket.create("render_color", Integer.class);
+    public static final DataTicket<Integer> PACKED_LIGHT = DataTicket.create("packed_light", Integer.class);
     public static final DataTicket<GeoVector> POSITION = DataTicket.create("position", GeoVector.class);
     public static final DataTicket<EntityLivingBase> ENTITY = DataTicket.create("entity", EntityLivingBase.class);
     public static final DataTicket<ItemStack> ITEM_STACK = DataTicket.create("item_stack", ItemStack.class);
