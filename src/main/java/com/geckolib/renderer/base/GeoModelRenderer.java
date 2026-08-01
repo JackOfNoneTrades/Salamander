@@ -1,5 +1,8 @@
 package com.geckolib.renderer.base;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -9,6 +12,7 @@ import com.geckolib.animation.state.BoneSnapshot;
 import com.geckolib.animation.state.ModelPose;
 import com.geckolib.cache.model.BakedGeoModel;
 import com.geckolib.cache.model.GeoBone;
+import com.geckolib.cache.model.GeoLocator;
 import com.geckolib.cache.model.GeoQuad;
 import com.geckolib.cache.model.GeoVector;
 import com.geckolib.cache.model.GeoVertex;
@@ -34,6 +38,25 @@ public final class GeoModelRenderer {
         }
     }
 
+    public static GeoRenderTransforms captureTransforms(BakedGeoModel model, ModelPose pose) {
+        return captureTransforms(model, pose, new Matrix4f());
+    }
+
+    /** Captures animated bone and locator matrices without mutating the baked model or pose. */
+    public static GeoRenderTransforms captureTransforms(BakedGeoModel model, ModelPose pose,
+        Matrix4f renderRootMatrix) {
+        if (pose.model() != model) throw new IllegalArgumentException("Model pose belongs to a different baked model");
+
+        Map<String, GeoRenderTransform> bones = new LinkedHashMap<>();
+        Map<String, GeoRenderTransform> locators = new LinkedHashMap<>();
+
+        for (GeoBone bone : model.topLevelBones()) {
+            captureBoneTransforms(bone, pose, new Matrix4f(), renderRootMatrix, bones, locators);
+        }
+
+        return new GeoRenderTransforms(bones, locators);
+    }
+
     private static void renderBone(GeoBone bone, ModelPose pose, Matrix4f parentMatrix, GeoVertexConsumer consumer,
         float red, float green, float blue, float alpha) {
         BoneSnapshot snapshot = pose.get(bone);
@@ -54,7 +77,48 @@ public final class GeoModelRenderer {
         }
     }
 
+    private static void captureBoneTransforms(GeoBone bone, ModelPose pose, Matrix4f parentMatrix,
+        Matrix4f renderRootMatrix, Map<String, GeoRenderTransform> bones, Map<String, GeoRenderTransform> locators) {
+        BoneSnapshot snapshot = pose.get(bone);
+        Matrix4f pivotMatrix = new Matrix4f(parentMatrix);
+
+        transformToBonePivot(pivotMatrix, bone, snapshot);
+
+        Matrix4f geometryMatrix = new Matrix4f(pivotMatrix)
+            .translate(-bone.pivotX() * MODEL_SCALE, -bone.pivotY() * MODEL_SCALE, -bone.pivotZ() * MODEL_SCALE);
+        bones.put(
+            bone.name(),
+            new GeoRenderTransform(pivotMatrix, geometryMatrix, new Matrix4f(renderRootMatrix).mul(pivotMatrix)));
+
+        for (GeoLocator locator : bone.locators()) {
+            Matrix4f locatorMatrix = new Matrix4f(geometryMatrix)
+                .translate(
+                    locator.offsetX() * MODEL_SCALE,
+                    locator.offsetY() * MODEL_SCALE,
+                    locator.offsetZ() * MODEL_SCALE)
+                .rotateZ(locator.rotZ())
+                .rotateY(locator.rotY())
+                .rotateX(locator.rotX());
+
+            locators.put(
+                locator.name(),
+                new GeoRenderTransform(
+                    locatorMatrix,
+                    locatorMatrix,
+                    new Matrix4f(renderRootMatrix).mul(locatorMatrix)));
+        }
+
+        for (GeoBone child : bone.children()) {
+            captureBoneTransforms(child, pose, geometryMatrix, renderRootMatrix, bones, locators);
+        }
+    }
+
     private static void transformBone(Matrix4f matrix, GeoBone bone, BoneSnapshot snapshot) {
+        transformToBonePivot(matrix, bone, snapshot);
+        matrix.translate(-bone.pivotX() * MODEL_SCALE, -bone.pivotY() * MODEL_SCALE, -bone.pivotZ() * MODEL_SCALE);
+    }
+
+    private static void transformToBonePivot(Matrix4f matrix, GeoBone bone, BoneSnapshot snapshot) {
         matrix.translate(
             -snapshot.getTranslateX() * MODEL_SCALE,
             snapshot.getTranslateY() * MODEL_SCALE,
@@ -64,7 +128,6 @@ public final class GeoModelRenderer {
         matrix.rotateY(bone.baseRotY() + snapshot.getRotY());
         matrix.rotateX(bone.baseRotX() + snapshot.getRotX());
         matrix.scale(snapshot.getScaleX(), snapshot.getScaleY(), snapshot.getScaleZ());
-        matrix.translate(-bone.pivotX() * MODEL_SCALE, -bone.pivotY() * MODEL_SCALE, -bone.pivotZ() * MODEL_SCALE);
     }
 
     private static void renderCube(GeoCube cube, Matrix4f boneMatrix, GeoVertexConsumer consumer, float red,

@@ -1,6 +1,7 @@
 package com.geckolib.renderer;
 
 import java.nio.FloatBuffer;
+import java.util.List;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.ModelBase;
@@ -21,6 +22,8 @@ import com.geckolib.loading.math.MolangContext;
 import com.geckolib.loading.math.value.Variable;
 import com.geckolib.model.GeoModel;
 import com.geckolib.renderer.base.GeoRenderer;
+import com.geckolib.renderer.layer.GeoRenderLayer;
+import com.geckolib.renderer.layer.GeoRenderLayersContainer;
 
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
@@ -33,6 +36,7 @@ public class GeoEntityRenderer<T extends EntityLivingBase & GeoAnimatable> exten
     private static final float VANILLA_MODEL_OFFSET = 24 / 16f + 0.0078125f;
 
     protected final GeoModel<T> model;
+    protected final GeoRenderLayersContainer<T> renderLayers = new GeoRenderLayersContainer<>(this);
     protected float scaleWidth = 1;
     protected float scaleHeight = 1;
 
@@ -63,6 +67,21 @@ public class GeoEntityRenderer<T extends EntityLivingBase & GeoAnimatable> exten
     @Override
     public GeoModel<T> getGeoModel() {
         return this.model;
+    }
+
+    @Override
+    public List<GeoRenderLayer<T>> getRenderLayers() {
+        return this.renderLayers.getRenderLayers();
+    }
+
+    public GeoEntityRenderer<T> addRenderLayer(GeoRenderLayer<T> renderLayer) {
+        this.renderLayers.addLayer(renderLayer);
+
+        return this;
+    }
+
+    public boolean removeRenderLayer(GeoRenderLayer<T> renderLayer) {
+        return this.renderLayers.removeLayer(renderLayer);
     }
 
     public GeoEntityRenderer<T> withScale(float scale) {

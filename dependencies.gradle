@@ -43,6 +43,7 @@ dependencies {
     runtimeOnlyNonPublishable("org.fentanylsolutions.wawelauth:WawelAuth:1.0.4:dev")
     runtimeOnlyNonPublishable("dev.dediamondpro.resourcify:VintageResourcify:1.0.5:dev")
     runtimeOnlyNonPublishable("org.fentanylsolutions.vrap:vrap:1.0.1:dev")
+    runtimeOnlyNonPublishable("com.falsepattern:forgelin-mc1.7.10:2.4.1-2.3.10")
     runtimeOnlyNonPublishable("org.fentanylsolutions.fentlib:FentLib:0.0.53:dev") // WawelAuth dev runtime
     runtimeOnlyNonPublishable("com.github.GTNewHorizons:ModularUI2:2.3.80-1.7.10:dev") // WawelAuth UI
 

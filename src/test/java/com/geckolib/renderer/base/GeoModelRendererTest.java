@@ -1,6 +1,7 @@
 package com.geckolib.renderer.base;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertTrue;
 
 import java.io.InputStreamReader;
@@ -13,6 +14,8 @@ import java.util.List;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.common.util.ForgeDirection;
 
+import org.joml.Matrix4f;
+import org.joml.Vector3f;
 import org.junit.Test;
 
 import com.geckolib.animation.state.BoneSnapshot;
@@ -99,6 +102,51 @@ public class GeoModelRendererTest {
         }
     }
 
+    @Test
+    public void capturesBoneAndLocatorTransformsForOnePose() {
+        BakedGeoModel model = createTransformHierarchy();
+        ModelPose pose = ModelPose.create(model);
+
+        pose.get("root")
+            .get()
+            .setTranslation(2, 0, 0);
+
+        GeoRenderTransforms transforms = GeoModelRenderer
+            .captureTransforms(model, pose, new Matrix4f().translation(10, 20, 30));
+        GeoRenderTransform child = transforms.getBone("child")
+            .get();
+        GeoRenderTransform locator = transforms.getLocator("hand")
+            .get();
+        Vector3f childPosition = child.modelSpacePosition();
+        Vector3f childGeometryPosition = position(child.geometryMatrix());
+        Vector3f locatorPosition = locator.modelSpacePosition();
+        Vector3f locatorRenderPosition = locator.renderSpacePosition();
+
+        assertEquals(
+            2,
+            transforms.bones()
+                .size());
+        assertEquals(
+            1,
+            transforms.locators()
+                .size());
+        assertEquals(-0.125, childPosition.x, EPSILON);
+        assertEquals(1, childPosition.y, EPSILON);
+        assertEquals(-0.125, childGeometryPosition.x, EPSILON);
+        assertEquals(0, childGeometryPosition.y, EPSILON);
+        assertEquals(-1.125, locatorPosition.x, EPSILON);
+        assertEquals(0, locatorPosition.y, EPSILON);
+        assertEquals(8.875, locatorRenderPosition.x, EPSILON);
+        assertEquals(20, locatorRenderPosition.y, EPSILON);
+        assertEquals(30, locatorRenderPosition.z, EPSILON);
+
+        Matrix4f defensiveCopy = locator.modelSpaceMatrix();
+
+        defensiveCopy.translate(100, 100, 100);
+        assertNotSame(defensiveCopy, locator.modelSpaceMatrix());
+        assertEquals(-1.125, locator.modelSpacePosition().x, EPSILON);
+    }
+
     private static BakedGeoModel createHierarchy() {
         GeoVertex[] points = new GeoVertex[] { new GeoVertex(1, 0, 0), new GeoVertex(1, 1, 0), new GeoVertex(1, 1, 1),
             new GeoVertex(1, 0, 1) };
@@ -133,6 +181,34 @@ public class GeoModelRendererTest {
         children[0] = child;
 
         return new BakedGeoModel(new GeoBone[] { root }, Collections.emptyMap(), null);
+    }
+
+    private static BakedGeoModel createTransformHierarchy() {
+        GeoBone[] children = new GeoBone[1];
+        GeoBone root = new CuboidGeoBone(
+            null,
+            "root",
+            children,
+            new GeoCube[0],
+            new GeoLocator[0],
+            0,
+            0,
+            0,
+            0,
+            0,
+            (float) (Math.PI / 2));
+        GeoLocator[] locators = new GeoLocator[1];
+        GeoBone child = new CuboidGeoBone(root, "child", new GeoBone[0], new GeoCube[0], locators, 16, 0, 0, 0, 0, 0);
+        GeoLocator hand = new GeoLocator(child, "hand", 0, 16, 0, 0, 0, 0);
+
+        children[0] = child;
+        locators[0] = hand;
+
+        return new BakedGeoModel(new GeoBone[] { root }, Collections.singletonMap(hand.name(), hand), null);
+    }
+
+    private static Vector3f position(Matrix4f matrix) {
+        return matrix.transformPosition(new Vector3f());
     }
 
     private static GeoVertexConsumer collecting(List<Vertex> vertices) {
