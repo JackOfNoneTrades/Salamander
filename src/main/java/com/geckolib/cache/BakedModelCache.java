@@ -41,17 +41,8 @@ public final class BakedModelCache {
     }
 
     public BakedGeoModel getModel(ResourceLocation modelFile) {
-        BakedGeoModel model = this.cache.get(modelFile);
-
-        if (model == null) {
-            ResourceLocation stripped = GeckoLibResources.stripPrefixAndSuffix(modelFile);
-
-            if (!modelFile.equals(stripped)) {
-                GeckoLibConstants.LOGGER
-                    .error("Superfluous prefix or suffix in model resource path '{}'; use '{}'", modelFile, stripped);
-                model = this.cache.get(stripped);
-            }
-        }
+        ResourceLocation key = GeckoLibResources.stripPrefixAndSuffix(modelFile);
+        BakedGeoModel model = this.cache.get(key);
 
         if (model != null) return model;
 

@@ -52,12 +52,14 @@ public final class GeckoLibResourceReloadListener implements IResourceManagerRel
         ResourceFiles resources = findResources(resourceManager);
         Map<ResourceLocation, BakedGeoModel> models = new LinkedHashMap<>();
         Map<ResourceLocation, BakedAnimations> animations = new LinkedHashMap<>();
+        Map<ResourceLocation, ResourceLocation> modelSources = new LinkedHashMap<>();
+        Map<ResourceLocation, ResourceLocation> animationSources = new LinkedHashMap<>();
 
         for (ResourceLocation location : sorted(resources.models)) {
             try (Reader reader = openReader(resourceManager, location)) {
                 GeckoLibLoader loader = GeckoLibResources.findLoader(location);
 
-                models.put(GeckoLibResources.stripPrefixAndSuffix(location), loader.loadModel(location, reader));
+                putLoadedResource(models, modelSources, location, loader.loadModel(location, reader), "geometry");
             } catch (Exception exception) {
                 GeckoLibConstants.LOGGER.error("Error loading geometry resource '{}'", location, exception);
             }
@@ -69,13 +71,24 @@ public final class GeckoLibResourceReloadListener implements IResourceManagerRel
             try (Reader reader = openReader(resourceManager, location)) {
                 GeckoLibLoader loader = GeckoLibResources.findLoader(location);
 
-                animations.put(
-                    GeckoLibResources.stripPrefixAndSuffix(location),
-                    loader.loadAnimations(location, reader, mathParser));
+                putLoadedResource(
+                    animations,
+                    animationSources,
+                    location,
+                    loader.loadAnimations(location, reader, mathParser),
+                    "animation");
             } catch (Exception exception) {
                 GeckoLibConstants.LOGGER.error("Error loading animation resource '{}'", location, exception);
             }
         }
+
+        int legacyModels = countLegacySources(modelSources);
+        int legacyAnimations = countLegacySources(animationSources);
+
+        if (legacyModels != 0 || legacyAnimations != 0) GeckoLibConstants.LOGGER.info(
+            "Loaded {} legacy-path geometry models and {} legacy-path animation files",
+            legacyModels,
+            legacyAnimations);
 
         GeckoLibResources.apply(models, animations);
     }
@@ -152,8 +165,8 @@ public final class GeckoLibResourceReloadListener implements IResourceManagerRel
         String resourcePath = components[2];
         ResourceLocation location = new ResourceLocation(components[1], resourcePath);
 
-        if (resourcePath.startsWith(GeckoLibResources.MODELS_PATH + "/")) resources.models.add(location);
-        else if (resourcePath.startsWith(GeckoLibResources.ANIMATIONS_PATH + "/")) resources.animations.add(location);
+        if (GeckoLibResources.isModelResourcePath(resourcePath)) resources.models.add(location);
+        else if (GeckoLibResources.isAnimationResourcePath(resourcePath)) resources.animations.add(location);
     }
 
     private static Reader openReader(IResourceManager resourceManager, ResourceLocation location) throws IOException {
@@ -166,9 +179,33 @@ public final class GeckoLibResourceReloadListener implements IResourceManagerRel
     private static List<ResourceLocation> sorted(Set<ResourceLocation> locations) {
         List<ResourceLocation> sorted = new ArrayList<>(locations);
 
-        sorted.sort(Comparator.comparing(ResourceLocation::toString));
+        sorted.sort(
+            Comparator
+                .comparingInt((ResourceLocation location) -> GeckoLibResources.isLegacyResourcePath(location) ? 0 : 1)
+                .thenComparing(ResourceLocation::toString));
 
         return sorted;
+    }
+
+    private static <T> void putLoadedResource(Map<ResourceLocation, T> resources,
+        Map<ResourceLocation, ResourceLocation> sources, ResourceLocation source, T resource, String type) {
+        ResourceLocation key = GeckoLibResources.stripPrefixAndSuffix(source);
+        ResourceLocation previousSource = sources.put(key, source);
+
+        resources.put(key, resource);
+
+        if (previousSource != null) GeckoLibConstants.LOGGER
+            .warn("{} resource '{}' replaces '{}' for logical resource '{}'", type, source, previousSource, key);
+    }
+
+    private static int countLegacySources(Map<ResourceLocation, ResourceLocation> sources) {
+        int count = 0;
+
+        for (ResourceLocation source : sources.values()) {
+            if (GeckoLibResources.isLegacyResourcePath(source)) count++;
+        }
+
+        return count;
     }
 
     private static String normalize(String path) {

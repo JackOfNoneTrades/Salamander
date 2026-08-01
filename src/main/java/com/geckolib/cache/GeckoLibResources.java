@@ -20,8 +20,11 @@ public final class GeckoLibResources {
 
     public static final String ANIMATIONS_PATH = "geckolib/animations";
     public static final String MODELS_PATH = "geckolib/models";
+    public static final String LEGACY_ANIMATIONS_PATH = "animations";
+    public static final String LEGACY_MODELS_PATH = "geo";
     public static final Pattern SUFFIX_STRIPPER = Pattern.compile("((\\.geo)|((\\.animation)s?))?(\\.json)$");
-    public static final Pattern PREFIX_STRIPPER = Pattern.compile("^(geckolib/)?((animations/)|(models/))?");
+    public static final Pattern PREFIX_STRIPPER = Pattern
+        .compile("^(?:(?:geckolib/)(?:(?:animations|models)/)?|(?:animations|models|geo)/)");
 
     private static final List<LoaderEntry> loaders = new ArrayList<>();
     private static volatile CacheSnapshot caches = CacheSnapshot.empty();
@@ -89,12 +92,30 @@ public final class GeckoLibResources {
         return original.equals(stripped) ? path : new ResourceLocation(path.getResourceDomain(), stripped);
     }
 
+    public static boolean isModelResourcePath(String path) {
+        return isUnder(path, MODELS_PATH) || isUnder(path, LEGACY_MODELS_PATH);
+    }
+
+    public static boolean isAnimationResourcePath(String path) {
+        return isUnder(path, ANIMATIONS_PATH) || isUnder(path, LEGACY_ANIMATIONS_PATH);
+    }
+
+    public static boolean isLegacyResourcePath(ResourceLocation path) {
+        String resourcePath = path.getResourcePath();
+
+        return isUnder(resourcePath, LEGACY_MODELS_PATH) || isUnder(resourcePath, LEGACY_ANIMATIONS_PATH);
+    }
+
     private static boolean supportsPath(GeckoLibLoader loader, String path) {
         for (String extension : loader.supportedExtensions()) {
             if (path.endsWith("." + extension)) return true;
         }
 
         return false;
+    }
+
+    private static boolean isUnder(String path, String root) {
+        return path.startsWith(root + "/");
     }
 
     private static final class LoaderEntry {

@@ -11,6 +11,7 @@ import static org.junit.Assert.assertTrue;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 
@@ -171,6 +172,22 @@ public class GeometryLoaderTest {
     }
 
     @Test
+    public void loadsOfficialGeckoLibThreeGeometryFormatFromLegacyPath() {
+        String geometry = "{\"format_version\":\"1.12.0\",\"minecraft:geometry\":[{\"description\":{"
+            + "\"identifier\":\"geometry.legacy\",\"texture_width\":16,\"texture_height\":16},"
+            + "\"bones\":[{\"name\":\"root\",\"cubes\":[{\"origin\":[0,0,0],\"size\":[1,1,1],"
+            + "\"uv\":[0,0]}]}]}]}";
+        ResourceLocation path = new ResourceLocation("example", "geo/entity/legacy.geo.json");
+        BakedGeoModel model = new GeckoLibGsonLoader().loadModel(path, new StringReader(geometry));
+
+        assertEquals(
+            "geometry.legacy",
+            model.properties()
+                .identifier());
+        assertEquals("root", model.topLevelBones()[0].name());
+    }
+
+    @Test
     public void normalizesResourcePathsAndUsesMissingModel() {
         ResourceLocation fullModel = new ResourceLocation("example", "geckolib/models/entity/test.geo.json");
         ResourceLocation fullAnimation = new ResourceLocation(
@@ -184,15 +201,28 @@ public class GeometryLoaderTest {
         assertEquals(
             new ResourceLocation("example", "entity/test"),
             GeckoLibResources.stripPrefixAndSuffix(new ResourceLocation("example", "models/entity/test.geo.json")));
+        assertEquals(
+            new ResourceLocation("example", "entity/test"),
+            GeckoLibResources.stripPrefixAndSuffix(new ResourceLocation("example", "geo/entity/test.geo.json")));
+        assertEquals(
+            new ResourceLocation("example", "entity/test"),
+            GeckoLibResources.stripPrefixAndSuffix(new ResourceLocation("example", "animations/entity/test.json")));
+        assertTrue(GeckoLibResources.isModelResourcePath("geo/entity/test.geo.json"));
+        assertTrue(GeckoLibResources.isAnimationResourcePath("animations/entity/test.json"));
+        assertFalse(GeckoLibResources.isModelResourcePath("models/entity/test.json"));
         assertTrue(GeckoLibResources.findLoader(fullModel) instanceof GeckoLibGsonLoader);
 
+        BakedGeoModel legacyModel = new BakedGeoModel(new GeoBone[0], Collections.emptyMap(), null);
+        BakedModelCache legacyCache = new BakedModelCache(
+            Collections.singletonMap(new ResourceLocation("example", "entity/test"), legacyModel));
         BakedModelCache empty = new BakedModelCache(Collections.emptyMap());
 
+        assertSame(legacyModel, legacyCache.getModel(new ResourceLocation("example", "geo/entity/test.geo.json")));
         assertSame(BakedModelCache.missingModel(), empty.getModel(new ResourceLocation("example", "absent")));
         assertTrue(
             BakedModelCache.missingModel()
                 .isMissingno());
-        assertFalse(new BakedGeoModel(new GeoBone[0], Collections.emptyMap(), null).isMissingno());
+        assertFalse(legacyModel.isMissingno());
     }
 
     private static String geometryWithBones(String bones) {
