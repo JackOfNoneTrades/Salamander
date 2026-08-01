@@ -68,6 +68,13 @@
           }
         }
       }
+    },
+    "animation.test.marker_zero": {
+      "animation_length": 1,
+      "loop": true,
+      "timeline": {
+        "0.0": "zero"
+      }
     }
   }
 }

@@ -8,6 +8,9 @@ import static org.junit.Assert.assertTrue;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 import org.junit.Test;
 
@@ -27,6 +30,8 @@ public class AnimationControllerTest {
     private static final double EPSILON = 1.0E-5;
     private static final RawAnimation WALK = RawAnimation.begin()
         .thenLoop("animation.test.walk");
+    private static final RawAnimation ZERO_MARKER = RawAnimation.begin()
+        .thenLoop("animation.test.marker_zero");
 
     @Test
     public void advancesAndLoopsUsingMinecraftTicks() throws Exception {
@@ -124,6 +129,60 @@ public class AnimationControllerTest {
         assertFalse(animatable.voiceController.isTriggeredAnimation("roar"));
     }
 
+    @Test
+    public void dispatchesKeyframeMarkersOncePerLoopCrossing() throws Exception {
+        EventAnimatable animatable = new EventAnimatable();
+        AnimatableManager<EventAnimatable> manager = animatable.cache.getManagerForId(4);
+        BakedAnimations animations = loadFixture();
+
+        animatable.controller.tick(animatable, manager, animations, 0, MolangContext.EMPTY);
+        animatable.controller.tick(animatable, manager, animations, 5.5, MolangContext.EMPTY);
+        animatable.controller.tick(animatable, manager, animations, 10.5, MolangContext.EMPTY);
+        animatable.controller.tick(animatable, manager, animations, 15.5, MolangContext.EMPTY);
+
+        assertEquals(
+            Arrays.asList("sound:test.step", "particle:test.dust", "custom:test_instruction"),
+            animatable.events);
+        assertEquals(0.5f, animatable.partialTick, EPSILON);
+
+        animatable.controller.tick(animatable, manager, animations, 25.5, MolangContext.EMPTY);
+
+        assertEquals(
+            Arrays.asList("sound:test.step", "particle:test.dust", "custom:test_instruction", "sound:test.step"),
+            animatable.events);
+    }
+
+    @Test
+    public void dispatchesAllMarkersCrossedByOneLargeAdvance() throws Exception {
+        EventAnimatable animatable = new EventAnimatable();
+        AnimatableManager<EventAnimatable> manager = animatable.cache.getManagerForId(5);
+        BakedAnimations animations = loadFixture();
+
+        animatable.controller.tick(animatable, manager, animations, 0, MolangContext.EMPTY);
+        animatable.controller.tick(animatable, manager, animations, 20, MolangContext.EMPTY);
+
+        assertEquals(
+            Arrays.asList("sound:test.step", "particle:test.dust", "custom:test_instruction"),
+            animatable.events);
+    }
+
+    @Test
+    public void dispatchesStartMarkersOnceForEachLoop() throws Exception {
+        ZeroMarkerAnimatable animatable = new ZeroMarkerAnimatable();
+        AnimatableManager<ZeroMarkerAnimatable> manager = animatable.cache.getManagerForId(6);
+        BakedAnimations animations = loadFixture();
+
+        animatable.controller.tick(animatable, manager, animations, 0, MolangContext.EMPTY);
+        animatable.controller.tick(animatable, manager, animations, 1, MolangContext.EMPTY);
+        assertEquals(1, animatable.events);
+
+        animatable.controller.tick(animatable, manager, animations, 20, MolangContext.EMPTY);
+        assertEquals(1, animatable.events);
+
+        animatable.controller.tick(animatable, manager, animations, 21, MolangContext.EMPTY);
+        assertEquals(2, animatable.events);
+    }
+
     private BakedAnimations loadFixture() throws Exception {
         try (Reader reader = new InputStreamReader(
             getClass().getResourceAsStream("/animations/headless.animation.json"),
@@ -187,6 +246,58 @@ public class AnimationControllerTest {
         @Override
         public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
             controllers.add(this.actionController, this.voiceController);
+        }
+
+        @Override
+        public AnimatableInstanceCache getAnimatableInstanceCache() {
+            return this.cache;
+        }
+    }
+
+    private static final class EventAnimatable implements GeoAnimatable {
+
+        private final List<String> events = new ArrayList<>();
+        private float partialTick;
+        private final AnimationController<EventAnimatable> controller = new AnimationController<EventAnimatable>(
+            test -> test.setAndContinue(WALK)).setSoundKeyframeHandler(event -> {
+                this.events.add(
+                    "sound:" + event.keyframeData()
+                        .getSound());
+                this.partialTick = event.getPartialTick();
+                assertEquals(this, event.animatable());
+                assertEquals(this.controller, event.controller());
+            })
+                .setParticleKeyframeHandler(
+                    event -> this.events.add(
+                        "particle:" + event.keyframeData()
+                            .getEffect()))
+                .setCustomInstructionKeyframeHandler(
+                    event -> this.events.add(
+                        "custom:" + event.keyframeData()
+                            .getInstructions()));
+        private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
+
+        @Override
+        public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
+            controllers.add(this.controller);
+        }
+
+        @Override
+        public AnimatableInstanceCache getAnimatableInstanceCache() {
+            return this.cache;
+        }
+    }
+
+    private static final class ZeroMarkerAnimatable implements GeoAnimatable {
+
+        private int events;
+        private final AnimationController<ZeroMarkerAnimatable> controller = new AnimationController<ZeroMarkerAnimatable>(
+            test -> test.setAndContinue(ZERO_MARKER)).setCustomInstructionKeyframeHandler(event -> this.events++);
+        private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
+
+        @Override
+        public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
+            controllers.add(this.controller);
         }
 
         @Override

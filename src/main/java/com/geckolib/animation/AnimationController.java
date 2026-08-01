@@ -13,8 +13,13 @@ import com.geckolib.animation.state.AnimationPoint;
 import com.geckolib.animation.state.AnimationTest;
 import com.geckolib.animation.state.BoneSnapshot;
 import com.geckolib.animation.state.ControllerState;
+import com.geckolib.animation.state.KeyFrameEvent;
 import com.geckolib.cache.animation.Animation;
 import com.geckolib.cache.animation.BakedAnimations;
+import com.geckolib.cache.animation.keyframeevent.CustomInstructionKeyframeData;
+import com.geckolib.cache.animation.keyframeevent.KeyFrameData;
+import com.geckolib.cache.animation.keyframeevent.ParticleKeyframeData;
+import com.geckolib.cache.animation.keyframeevent.SoundKeyframeData;
 import com.geckolib.loading.math.MolangContext;
 
 /**
@@ -29,6 +34,9 @@ public class AnimationController<T extends GeoAnimatable> {
     private final AnimationStateHandler<T> stateHandler;
     private final Map<String, RawAnimation> triggerableAnimations = new LinkedHashMap<>();
 
+    private KeyframeEventHandler<T, SoundKeyframeData> soundKeyframeHandler;
+    private KeyframeEventHandler<T, ParticleKeyframeData> particleKeyframeHandler;
+    private KeyframeEventHandler<T, CustomInstructionKeyframeData> customKeyframeHandler;
     private int transitionTicks;
     private double animationSpeed = 1;
     private boolean additiveAnimations;
@@ -158,6 +166,26 @@ public class AnimationController<T extends GeoAnimatable> {
         return this;
     }
 
+    public AnimationController<T> setSoundKeyframeHandler(KeyframeEventHandler<T, SoundKeyframeData> soundHandler) {
+        this.soundKeyframeHandler = soundHandler;
+
+        return this;
+    }
+
+    public AnimationController<T> setParticleKeyframeHandler(
+        KeyframeEventHandler<T, ParticleKeyframeData> particleHandler) {
+        this.particleKeyframeHandler = particleHandler;
+
+        return this;
+    }
+
+    public AnimationController<T> setCustomInstructionKeyframeHandler(
+        KeyframeEventHandler<T, CustomInstructionKeyframeData> customInstructionHandler) {
+        this.customKeyframeHandler = customInstructionHandler;
+
+        return this;
+    }
+
     public void setAnimation(RawAnimation rawAnimation) {
         if (rawAnimation == null || rawAnimation.getStageCount() == 0)
             throw new IllegalArgumentException("AnimationController cannot play an empty animation");
@@ -265,13 +293,18 @@ public class AnimationController<T extends GeoAnimatable> {
             this.stageIndex = 0;
             this.stageTime = 0;
             this.finished = false;
-            initializeCurrentStage(animations);
+            initializeCurrentStage(animatable, animations);
         }
 
         if (this.animationPoint == null) return null;
 
-        if (this.playState != PlayState.PAUSE && !this.finished)
-            advanceTimeline(tickDelta / 20d * this.animationSpeed, animations, context);
+        if (this.playState != PlayState.PAUSE && !this.finished) advanceTimeline(
+            animatable,
+            manager,
+            tickDelta / 20d * this.animationSpeed,
+            animations,
+            context,
+            partialTick(animatableAge));
 
         advanceTransition(tickDelta);
 
@@ -313,7 +346,7 @@ public class AnimationController<T extends GeoAnimatable> {
         return delta;
     }
 
-    private void initializeCurrentStage(BakedAnimations animations) {
+    private void initializeCurrentStage(T animatable, BakedAnimations animations) {
         while (this.stageIndex < this.currentRawAnimation.getStageCount()) {
             RawAnimation.Stage rawStage = this.currentRawAnimation.getAnimationStages()
                 .get(this.stageIndex);
@@ -321,6 +354,7 @@ public class AnimationController<T extends GeoAnimatable> {
 
             if (animation != null) {
                 this.animationPoint = AnimationPoint.createFor(animation, this.easingOverride, rawStage.loopType(), 0);
+                validateKeyframeHandlers(animatable, animation);
                 return;
             }
 
@@ -331,8 +365,11 @@ public class AnimationController<T extends GeoAnimatable> {
         this.finished = true;
     }
 
-    private void advanceTimeline(double timeAdvanced, BakedAnimations animations, MolangContext molangContext) {
+    private void advanceTimeline(T animatable, AnimatableManager<T> manager, double timeAdvanced,
+        BakedAnimations animations, MolangContext molangContext, float partialTick) {
         if (timeAdvanced == 0 || this.animationPoint == null) return;
+
+        double previousStageTime = this.stageTime;
 
         this.stageTime += timeAdvanced;
 
@@ -341,15 +378,30 @@ public class AnimationController<T extends GeoAnimatable> {
             double length = animation.length();
 
             if (this.stageTime < length) {
+                triggerKeyframeMarkersBetween(
+                    animatable,
+                    manager,
+                    animation,
+                    previousStageTime,
+                    this.stageTime,
+                    partialTick);
                 this.animationPoint = this.animationPoint.createNext(this.stageTime);
                 return;
             }
+
+            triggerKeyframeMarkersBetween(animatable, manager, animation, previousStageTime, length, partialTick);
 
             LoopType loopType = this.animationPoint.loopType() == LoopType.DEFAULT ? animation.loopType()
                 : this.animationPoint.loopType();
 
             if (loopType == LoopType.LOOP || loopType.shouldPlayAgain(animation)) {
-                this.stageTime = length == 0 ? 0 : this.stageTime % length;
+                if (length == 0) {
+                    this.stageTime = 0;
+                } else {
+                    this.stageTime %= length;
+                    triggerKeyframeMarkersBetween(animatable, manager, animation, 0, this.stageTime, partialTick);
+                }
+
                 this.animationPoint = AnimationPoint
                     .createFor(animation, this.easingOverride, loopType, this.stageTime);
                 return;
@@ -375,8 +427,87 @@ public class AnimationController<T extends GeoAnimatable> {
             ControllerState state = new ControllerState(molangContext).setAnimationTime(length);
 
             beginTransition(AnimationProcessor.evaluate(this.animationPoint.createNext(length), state), false);
-            initializeCurrentStage(animations);
+            initializeCurrentStage(animatable, animations);
+            previousStageTime = 0;
         }
+    }
+
+    private void triggerKeyframeMarkersBetween(T animatable, AnimatableManager<T> manager, Animation animation,
+        double fromTime, double toTime, float partialTick) {
+        Animation.KeyframeMarkers markers = animation.keyframeMarkers();
+
+        triggerKeyframeMarkers(
+            animatable,
+            manager,
+            markers.sounds(),
+            fromTime,
+            toTime,
+            this.soundKeyframeHandler,
+            partialTick);
+        triggerKeyframeMarkers(
+            animatable,
+            manager,
+            markers.particles(),
+            fromTime,
+            toTime,
+            this.particleKeyframeHandler,
+            partialTick);
+        triggerKeyframeMarkers(
+            animatable,
+            manager,
+            markers.customInstructions(),
+            fromTime,
+            toTime,
+            this.customKeyframeHandler,
+            partialTick);
+    }
+
+    private <E extends KeyFrameData> void triggerKeyframeMarkers(T animatable, AnimatableManager<T> manager,
+        E[] markers, double fromTime, double toTime, KeyframeEventHandler<T, E> handler, float partialTick) {
+        if (handler == null || toTime <= fromTime) return;
+
+        for (E marker : markers) {
+            if (marker.getTime() > toTime) break;
+
+            if (marker.getTime() > fromTime || fromTime == 0) {
+                handler.handle(new KeyFrameEvent<>(animatable, manager, this, marker, partialTick));
+            }
+        }
+    }
+
+    private void validateKeyframeHandlers(T animatable, Animation animation) {
+        Animation.KeyframeMarkers markers = animation.keyframeMarkers();
+
+        if (markers.sounds().length > 0 && this.soundKeyframeHandler == null) {
+            com.geckolib.GeckoLibConstants.LOGGER.warn(
+                "Animation controller {} for {} loaded {} with sound keyframes but no sound handler",
+                this.name,
+                animatable.getClass()
+                    .getName(),
+                animation.name());
+        }
+
+        if (markers.particles().length > 0 && this.particleKeyframeHandler == null) {
+            com.geckolib.GeckoLibConstants.LOGGER.warn(
+                "Animation controller {} for {} loaded {} with particle keyframes but no particle handler",
+                this.name,
+                animatable.getClass()
+                    .getName(),
+                animation.name());
+        }
+
+        if (markers.customInstructions().length > 0 && this.customKeyframeHandler == null) {
+            com.geckolib.GeckoLibConstants.LOGGER.warn(
+                "Animation controller {} for {} loaded {} with custom instruction keyframes but no custom handler",
+                this.name,
+                animatable.getClass()
+                    .getName(),
+                animation.name());
+        }
+    }
+
+    private static float partialTick(double animatableAge) {
+        return (float) (animatableAge - Math.floor(animatableAge));
     }
 
     private void beginTransition(Map<String, BoneSnapshot> startPose, boolean resetting) {
@@ -499,5 +630,11 @@ public class AnimationController<T extends GeoAnimatable> {
     public interface AnimationStateHandler<A extends GeoAnimatable> {
 
         PlayState handle(AnimationTest<A> animationTest);
+    }
+
+    @FunctionalInterface
+    public interface KeyframeEventHandler<A extends GeoAnimatable, E extends KeyFrameData> {
+
+        void handle(KeyFrameEvent<A, E> event);
     }
 }
