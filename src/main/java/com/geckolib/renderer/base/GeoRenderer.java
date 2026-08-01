@@ -53,6 +53,14 @@ public interface GeoRenderer<T extends GeoAnimatable> {
 
     default void render(T animatable, long instanceId, double animatableAge, float partialTicks,
         MolangContext molangContext, float red, float green, float blue, float alpha) {
+        AnimatableManager<T> manager = animatable.getAnimatableInstanceCache()
+            .getManagerForId(instanceId);
+
+        manager.setAnimatableData(com.geckolib.constant.DataTickets.ANIMATABLE_INSTANCE_ID, instanceId);
+        manager.setAnimatableData(com.geckolib.constant.DataTickets.PARTIAL_TICK, partialTicks);
+        manager.setAnimatableData(com.geckolib.constant.DataTickets.TICK, animatableAge);
+        manager.setAnimatableData(com.geckolib.constant.DataTickets.ANIMATABLE_MANAGER, manager);
+
         ModelPose pose = createModelPose(animatable, instanceId, animatableAge, molangContext);
 
         getGeoModel().setCustomAnimations(animatable, instanceId, pose, partialTicks);

@@ -14,4 +14,10 @@ public class CommonProxy {
     public void handleEntityAnimationTrigger(int entityId, String controllerName, String animationName) {}
 
     public void handleStopTriggeredEntityAnimation(int entityId, String controllerName, String animationName) {}
+
+    public void handleSingletonAnimationTrigger(String syncableId, long instanceId, String controllerName,
+        String animationName) {}
+
+    public void handleStopTriggeredSingletonAnimation(String syncableId, long instanceId, String controllerName,
+        String animationName) {}
 }

@@ -26,7 +26,10 @@ public class EarlyMixinLoader implements IEarlyMixinLoader, IFMLLoadingPlugin {
         List<String> mixins = new ArrayList<>();
 
         if (FMLLaunchHandler.side()
-            .isClient()) mixins.add("minecraft.client.resources.AccessorAbstractResourcePack");
+            .isClient()) {
+            mixins.add("minecraft.client.AccessorMinecraft");
+            mixins.add("minecraft.client.resources.AccessorAbstractResourcePack");
+        }
 
         return mixins;
     }

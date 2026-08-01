@@ -6,8 +6,12 @@ import net.minecraft.world.WorldServer;
 
 import org.fentanylsolutions.salamander.Salamander;
 
+import com.geckolib.animatable.SingletonGeoAnimatable;
+import com.geckolib.cache.SyncedSingletonAnimatableCache;
 import com.geckolib.network.packet.entity.EntityAnimTriggerPacket;
 import com.geckolib.network.packet.entity.StopTriggeredEntityAnimPacket;
+import com.geckolib.network.packet.singleton.SingletonAnimTriggerPacket;
+import com.geckolib.network.packet.singleton.StopTriggeredSingletonAnimPacket;
 
 import cpw.mods.fml.common.network.NetworkRegistry;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
@@ -21,6 +25,8 @@ public final class GeckoLibNetwork {
 
     private static final int ENTITY_TRIGGER_PACKET_ID = 0;
     private static final int STOP_ENTITY_TRIGGER_PACKET_ID = 1;
+    private static final int SINGLETON_TRIGGER_PACKET_ID = 2;
+    private static final int STOP_SINGLETON_TRIGGER_PACKET_ID = 3;
     private static final SimpleNetworkWrapper CHANNEL = NetworkRegistry.INSTANCE.newSimpleChannel(Salamander.MODID);
 
     private static boolean initialized;
@@ -40,6 +46,16 @@ public final class GeckoLibNetwork {
             StopTriggeredEntityAnimPacket.Handler.class,
             StopTriggeredEntityAnimPacket.class,
             STOP_ENTITY_TRIGGER_PACKET_ID,
+            Side.CLIENT);
+        CHANNEL.registerMessage(
+            SingletonAnimTriggerPacket.Handler.class,
+            SingletonAnimTriggerPacket.class,
+            SINGLETON_TRIGGER_PACKET_ID,
+            Side.CLIENT);
+        CHANNEL.registerMessage(
+            StopTriggeredSingletonAnimPacket.Handler.class,
+            StopTriggeredSingletonAnimPacket.class,
+            STOP_SINGLETON_TRIGGER_PACKET_ID,
             Side.CLIENT);
     }
 
@@ -63,6 +79,32 @@ public final class GeckoLibNetwork {
         if (!message.isValid()) throw new IllegalArgumentException("Invalid entity animation stop request");
 
         sendToTrackingAndSelf(entity, message);
+    }
+
+    public static void triggerSingletonAnimation(SingletonGeoAnimatable animatable, Entity relatedEntity,
+        long instanceId, String controllerName, String animationName) {
+        SingletonAnimTriggerPacket message = new SingletonAnimTriggerPacket(
+            SyncedSingletonAnimatableCache.getOrCreateId(animatable),
+            instanceId,
+            controllerName,
+            animationName);
+
+        if (!message.isValid()) throw new IllegalArgumentException("Invalid singleton animation trigger");
+
+        sendToTrackingAndSelf(relatedEntity, message);
+    }
+
+    public static void stopTriggeredSingletonAnimation(SingletonGeoAnimatable animatable, Entity relatedEntity,
+        long instanceId, String controllerName, String animationName) {
+        StopTriggeredSingletonAnimPacket message = new StopTriggeredSingletonAnimPacket(
+            SyncedSingletonAnimatableCache.getOrCreateId(animatable),
+            instanceId,
+            controllerName,
+            animationName);
+
+        if (!message.isValid()) throw new IllegalArgumentException("Invalid singleton animation stop request");
+
+        sendToTrackingAndSelf(relatedEntity, message);
     }
 
     private static void sendToTrackingAndSelf(Entity entity, IMessage message) {
