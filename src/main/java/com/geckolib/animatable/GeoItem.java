@@ -33,6 +33,15 @@ public interface GeoItem extends SingletonGeoAnimatable {
         return Long.MIN_VALUE | Integer.toUnsignedLong(System.identityHashCode(stack));
     }
 
+    /**
+     * Returns the armor-renderer namespace for a stack ID, kept separate from ordinary item render instances.
+     */
+    static long getArmorId(ItemStack stack) {
+        long itemId = getId(stack);
+
+        return itemId == Long.MIN_VALUE ? Long.MAX_VALUE : -itemId;
+    }
+
     /** Reserves and stores an ID on first use. Must only be called from the logical server. */
     static long getOrAssignId(ItemStack stack, World world) {
         if (stack == null) throw new IllegalArgumentException("Item stack cannot be null");

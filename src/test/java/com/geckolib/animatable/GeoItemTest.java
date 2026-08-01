@@ -44,6 +44,23 @@ public class GeoItemTest {
     }
 
     @Test
+    public void armorIdentityUsesSeparateNamespaceWithoutCreatingNbt() {
+        ItemStack transientStack = new ItemStack(new Item());
+        long itemId = GeoItem.getId(transientStack);
+
+        assertEquals(-itemId, GeoItem.getArmorId(transientStack));
+        assertFalse(transientStack.hasTagCompound());
+
+        ItemStack assignedStack = new ItemStack(new Item());
+        NBTTagCompound tag = new NBTTagCompound();
+
+        tag.setLong(GeoItem.ANIMATABLE_ID_NBT_KEY, 42);
+        assignedStack.setTagCompound(tag);
+
+        assertEquals(-42, GeoItem.getArmorId(assignedStack));
+    }
+
+    @Test
     public void singletonRegistryDistinguishesInstancesOfTheSameClass() {
         TestItem first = new TestItem();
         TestItem second = new TestItem();

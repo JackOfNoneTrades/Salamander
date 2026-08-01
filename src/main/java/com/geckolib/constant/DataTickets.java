@@ -1,5 +1,6 @@
 package com.geckolib.constant;
 
+import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.item.ItemStack;
 
 import com.geckolib.animatable.GeoAnimatable;
@@ -22,7 +23,9 @@ public final class DataTickets {
     public static final DataTicket<Boolean> IS_CHILD = DataTicket.create("is_child", Boolean.class);
     public static final DataTicket<Boolean> IS_SITTING = DataTicket.create("is_sitting", Boolean.class);
     public static final DataTicket<Integer> RENDER_COLOR = DataTicket.create("render_color", Integer.class);
+    public static final DataTicket<EntityLivingBase> ENTITY = DataTicket.create("entity", EntityLivingBase.class);
     public static final DataTicket<ItemStack> ITEM_STACK = DataTicket.create("item_stack", ItemStack.class);
+    public static final DataTicket<ArmorRenderSlot> ARMOR_SLOT = DataTicket.create("armor_slot", ArmorRenderSlot.class);
     public static final DataTicket<ItemRenderPerspective> ITEM_RENDER_PERSPECTIVE = DataTicket
         .create("item_render_perspective", ItemRenderPerspective.class);
     public static final DataTicket<AnimatableManager<? extends GeoAnimatable>> ANIMATABLE_MANAGER = DataTicket

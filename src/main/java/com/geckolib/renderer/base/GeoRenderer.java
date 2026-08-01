@@ -65,7 +65,7 @@ public interface GeoRenderer<T extends GeoAnimatable> {
 
         getGeoModel().setCustomAnimations(animatable, instanceId, pose, partialTicks);
         adjustModelPose(animatable, pose, partialTicks);
-        Minecraft.getMinecraft().renderEngine.bindTexture(getGeoModel().getTextureResource(animatable));
+        bindTexture(animatable);
         RenderPassInfo<T> renderPassInfo = new RenderPassInfo<>(
             this,
             animatable,
@@ -78,6 +78,11 @@ public interface GeoRenderer<T extends GeoAnimatable> {
             alpha);
 
         renderModel(renderPassInfo, new ArrayList<>(getRenderLayers()));
+    }
+
+    /** Binds the primary model texture. Renderers embedded in a vanilla texture pass may override this. */
+    default void bindTexture(T animatable) {
+        Minecraft.getMinecraft().renderEngine.bindTexture(getGeoModel().getTextureResource(animatable));
     }
 
     default void adjustModelPose(T animatable, ModelPose pose, float partialTicks) {}
