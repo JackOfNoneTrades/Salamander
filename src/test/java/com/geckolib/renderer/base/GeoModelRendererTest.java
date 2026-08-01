@@ -79,6 +79,25 @@ public class GeoModelRendererTest {
     }
 
     @Test
+    public void filtersBoneGeometryWithoutLosingParentTransforms() {
+        BakedGeoModel model = createHierarchy();
+        ModelPose pose = ModelPose.create(model);
+        List<Vertex> vertices = new ArrayList<>();
+
+        pose.get("root")
+            .get()
+            .setTranslation(2, 0, 0);
+        GeoModelRenderer.render(model, pose, bone -> "child".equals(bone.name()), collecting(vertices), 1, 1, 1, 1);
+
+        assertEquals(4, vertices.size());
+        assertEquals(-0.125, vertices.get(0).x, EPSILON);
+
+        vertices.clear();
+        GeoModelRenderer.render(model, pose, bone -> "root".equals(bone.name()), collecting(vertices), 1, 1, 1, 1);
+        assertTrue(vertices.isEmpty());
+    }
+
+    @Test
     public void rendersParsedGeometryEndToEnd() throws Exception {
         BakedGeoModel model;
 

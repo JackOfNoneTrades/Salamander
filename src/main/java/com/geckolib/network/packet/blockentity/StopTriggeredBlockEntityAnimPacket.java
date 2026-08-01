@@ -1,4 +1,4 @@
-package com.geckolib.network.packet.entity;
+package com.geckolib.network.packet.blockentity;
 
 import org.fentanylsolutions.salamander.Salamander;
 
@@ -10,29 +10,26 @@ import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
 
-/** Stops one registered triggered animation on a client-side entity. */
-public final class StopTriggeredEntityAnimPacket implements IMessage {
+/** Stops one registered triggered animation on a client-side block entity. */
+public final class StopTriggeredBlockEntityAnimPacket implements IMessage {
 
     private static final int MAX_NAME_LENGTH = 256;
 
     private int protocolVersion;
-    private int entityId;
-    private boolean replacedEntity;
+    private int x;
+    private int y;
+    private int z;
     private String controllerName;
     private String animationName;
 
     @SuppressWarnings("unused")
-    public StopTriggeredEntityAnimPacket() {}
+    public StopTriggeredBlockEntityAnimPacket() {}
 
-    public StopTriggeredEntityAnimPacket(int entityId, String controllerName, String animationName) {
-        this(entityId, false, controllerName, animationName);
-    }
-
-    public StopTriggeredEntityAnimPacket(int entityId, boolean replacedEntity, String controllerName,
-        String animationName) {
+    public StopTriggeredBlockEntityAnimPacket(int x, int y, int z, String controllerName, String animationName) {
         this.protocolVersion = GeckoLibNetwork.PROTOCOL_VERSION;
-        this.entityId = entityId;
-        this.replacedEntity = replacedEntity;
+        this.x = x;
+        this.y = y;
+        this.z = z;
         this.controllerName = controllerName;
         this.animationName = animationName;
     }
@@ -40,8 +37,9 @@ public final class StopTriggeredEntityAnimPacket implements IMessage {
     @Override
     public void fromBytes(ByteBuf buffer) {
         this.protocolVersion = buffer.readInt();
-        this.entityId = buffer.readInt();
-        this.replacedEntity = buffer.readBoolean();
+        this.x = buffer.readInt();
+        this.y = buffer.readInt();
+        this.z = buffer.readInt();
         this.controllerName = readNullableString(buffer);
         this.animationName = readNullableString(buffer);
     }
@@ -49,18 +47,23 @@ public final class StopTriggeredEntityAnimPacket implements IMessage {
     @Override
     public void toBytes(ByteBuf buffer) {
         buffer.writeInt(this.protocolVersion);
-        buffer.writeInt(this.entityId);
-        buffer.writeBoolean(this.replacedEntity);
+        buffer.writeInt(this.x);
+        buffer.writeInt(this.y);
+        buffer.writeInt(this.z);
         writeNullableString(buffer, this.controllerName);
         writeNullableString(buffer, this.animationName);
     }
 
-    public int entityId() {
-        return this.entityId;
+    public int x() {
+        return this.x;
     }
 
-    public boolean isReplacedEntity() {
-        return this.replacedEntity;
+    public int y() {
+        return this.y;
+    }
+
+    public int z() {
+        return this.z;
     }
 
     public String controllerName() {
@@ -72,8 +75,7 @@ public final class StopTriggeredEntityAnimPacket implements IMessage {
     }
 
     public boolean isValid() {
-        return this.protocolVersion == GeckoLibNetwork.PROTOCOL_VERSION && this.entityId >= 0
-            && isValidNullableName(this.controllerName)
+        return this.protocolVersion == GeckoLibNetwork.PROTOCOL_VERSION && isValidNullableName(this.controllerName)
             && isValidNullableName(this.animationName);
     }
 
@@ -91,14 +93,15 @@ public final class StopTriggeredEntityAnimPacket implements IMessage {
         return name == null || !name.isEmpty() && name.length() <= MAX_NAME_LENGTH;
     }
 
-    public static final class Handler implements IMessageHandler<StopTriggeredEntityAnimPacket, IMessage> {
+    public static final class Handler implements IMessageHandler<StopTriggeredBlockEntityAnimPacket, IMessage> {
 
         @Override
-        public IMessage onMessage(StopTriggeredEntityAnimPacket message, MessageContext context) {
+        public IMessage onMessage(StopTriggeredBlockEntityAnimPacket message, MessageContext context) {
             if (message.isValid()) {
-                Salamander.proxy.handleStopTriggeredEntityAnimation(
-                    message.entityId(),
-                    message.isReplacedEntity(),
+                Salamander.proxy.handleStopTriggeredBlockEntityAnimation(
+                    message.x(),
+                    message.y(),
+                    message.z(),
                     message.controllerName(),
                     message.animationName());
             }

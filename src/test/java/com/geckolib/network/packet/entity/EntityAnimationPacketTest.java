@@ -25,8 +25,28 @@ public class EntityAnimationPacketTest {
 
             assertTrue(read.isValid());
             assertEquals(42, read.entityId());
+            assertFalse(read.isReplacedEntity());
             assertNull(read.controllerName());
             assertEquals("attack", read.animationName());
+        } finally {
+            buffer.release();
+        }
+    }
+
+    @Test
+    public void triggerPacketPreservesReplacedEntityRouting() {
+        ByteBuf buffer = Unpooled.buffer();
+
+        try {
+            EntityAnimTriggerPacket written = new EntityAnimTriggerPacket(17, true, "action", "attack");
+            EntityAnimTriggerPacket read = new EntityAnimTriggerPacket();
+
+            written.toBytes(buffer);
+            read.fromBytes(buffer);
+
+            assertTrue(read.isValid());
+            assertEquals(17, read.entityId());
+            assertTrue(read.isReplacedEntity());
         } finally {
             buffer.release();
         }
@@ -45,6 +65,7 @@ public class EntityAnimationPacketTest {
 
             assertTrue(read.isValid());
             assertEquals(7, read.entityId());
+            assertFalse(read.isReplacedEntity());
             assertNull(read.controllerName());
             assertNull(read.animationName());
         } finally {

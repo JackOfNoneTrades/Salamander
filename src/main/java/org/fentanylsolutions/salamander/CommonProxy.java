@@ -11,13 +11,20 @@ public class CommonProxy {
         GeckoLibNetwork.init();
     }
 
-    public void handleEntityAnimationTrigger(int entityId, String controllerName, String animationName) {}
+    public void handleEntityAnimationTrigger(int entityId, boolean replacedEntity, String controllerName,
+        String animationName) {}
 
-    public void handleStopTriggeredEntityAnimation(int entityId, String controllerName, String animationName) {}
+    public void handleStopTriggeredEntityAnimation(int entityId, boolean replacedEntity, String controllerName,
+        String animationName) {}
 
     public void handleSingletonAnimationTrigger(String syncableId, long instanceId, String controllerName,
         String animationName) {}
 
     public void handleStopTriggeredSingletonAnimation(String syncableId, long instanceId, String controllerName,
+        String animationName) {}
+
+    public void handleBlockEntityAnimationTrigger(int x, int y, int z, String controllerName, String animationName) {}
+
+    public void handleStopTriggeredBlockEntityAnimation(int x, int y, int z, String controllerName,
         String animationName) {}
 }

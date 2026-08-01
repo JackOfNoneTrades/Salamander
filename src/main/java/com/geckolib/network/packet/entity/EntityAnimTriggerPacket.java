@@ -17,6 +17,7 @@ public final class EntityAnimTriggerPacket implements IMessage {
 
     private int protocolVersion;
     private int entityId;
+    private boolean replacedEntity;
     private String controllerName;
     private String animationName;
 
@@ -24,8 +25,13 @@ public final class EntityAnimTriggerPacket implements IMessage {
     public EntityAnimTriggerPacket() {}
 
     public EntityAnimTriggerPacket(int entityId, String controllerName, String animationName) {
+        this(entityId, false, controllerName, animationName);
+    }
+
+    public EntityAnimTriggerPacket(int entityId, boolean replacedEntity, String controllerName, String animationName) {
         this.protocolVersion = GeckoLibNetwork.PROTOCOL_VERSION;
         this.entityId = entityId;
+        this.replacedEntity = replacedEntity;
         this.controllerName = controllerName;
         this.animationName = animationName;
     }
@@ -34,6 +40,7 @@ public final class EntityAnimTriggerPacket implements IMessage {
     public void fromBytes(ByteBuf buffer) {
         this.protocolVersion = buffer.readInt();
         this.entityId = buffer.readInt();
+        this.replacedEntity = buffer.readBoolean();
         this.controllerName = readNullableString(buffer);
         this.animationName = ByteBufUtils.readUTF8String(buffer);
     }
@@ -42,12 +49,17 @@ public final class EntityAnimTriggerPacket implements IMessage {
     public void toBytes(ByteBuf buffer) {
         buffer.writeInt(this.protocolVersion);
         buffer.writeInt(this.entityId);
+        buffer.writeBoolean(this.replacedEntity);
         writeNullableString(buffer, this.controllerName);
         ByteBufUtils.writeUTF8String(buffer, this.animationName);
     }
 
     public int entityId() {
         return this.entityId;
+    }
+
+    public boolean isReplacedEntity() {
+        return this.replacedEntity;
     }
 
     public String controllerName() {
@@ -89,6 +101,7 @@ public final class EntityAnimTriggerPacket implements IMessage {
             if (message.isValid()) {
                 Salamander.proxy.handleEntityAnimationTrigger(
                     message.entityId(),
+                    message.isReplacedEntity(),
                     message.controllerName(),
                     message.animationName());
             }

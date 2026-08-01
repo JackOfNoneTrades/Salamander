@@ -3,6 +3,7 @@ package com.geckolib.renderer.base;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Predicate;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.Tessellator;
@@ -18,6 +19,7 @@ import com.geckolib.animation.AnimationProcessor;
 import com.geckolib.animation.state.ModelPose;
 import com.geckolib.cache.animation.BakedAnimations;
 import com.geckolib.cache.model.BakedGeoModel;
+import com.geckolib.cache.model.GeoBone;
 import com.geckolib.loading.math.MolangContext;
 import com.geckolib.model.GeoModel;
 import com.geckolib.renderer.layer.GeoRenderLayer;
@@ -191,14 +193,27 @@ public interface GeoRenderer<T extends GeoAnimatable> {
      * Entity renderers use this for vanilla's hurt and color-multiplier passes.
      */
     default void renderModelGeometry(ModelPose pose, float red, float green, float blue, float alpha) {
+        renderModelGeometry(pose, bone -> true, red, green, blue, alpha);
+    }
+
+    /** Emits an already-posed, bone-filtered model without changing textures or GL capabilities. */
+    default void renderModelGeometry(ModelPose pose, Predicate<GeoBone> boneFilter, float red, float green, float blue,
+        float alpha) {
         Tessellator tessellator = Tessellator.instance;
         boolean drawing = false;
 
         try {
             tessellator.startDrawingQuads();
             drawing = true;
-            GeoModelRenderer
-                .render(pose.model(), pose, new TessellatorVertexConsumer(tessellator), red, green, blue, alpha);
+            GeoModelRenderer.render(
+                pose.model(),
+                pose,
+                boneFilter,
+                new TessellatorVertexConsumer(tessellator),
+                red,
+                green,
+                blue,
+                alpha);
             drawing = false;
             tessellator.draw();
         } finally {

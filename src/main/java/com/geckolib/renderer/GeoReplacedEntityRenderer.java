@@ -2,6 +2,8 @@ package com.geckolib.renderer;
 
 import java.nio.FloatBuffer;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.ModelBase;
@@ -14,9 +16,10 @@ import net.minecraft.util.ResourceLocation;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 
-import com.geckolib.animatable.GeoAnimatable;
+import com.geckolib.animatable.GeoReplacedEntity;
 import com.geckolib.animatable.manager.AnimatableManager;
 import com.geckolib.animation.state.ModelPose;
+import com.geckolib.cache.model.GeoVector;
 import com.geckolib.constant.DataTickets;
 import com.geckolib.loading.math.MolangContext;
 import com.geckolib.loading.math.value.Variable;
@@ -25,23 +28,26 @@ import com.geckolib.renderer.base.GeoRenderer;
 import com.geckolib.renderer.layer.GeoRenderLayer;
 import com.geckolib.renderer.layer.GeoRenderLayersContainer;
 
+import cpw.mods.fml.client.registry.RenderingRegistry;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 
-/** Vanilla-lifecycle entity renderer for living GeckoLib animatables. */
+/** Replaces an existing living entity renderer with one shared GeckoLib animatable. */
 @SideOnly(Side.CLIENT)
-public class GeoEntityRenderer<T extends EntityLivingBase & GeoAnimatable> extends RendererLivingEntity
-    implements GeoRenderer<T> {
+public class GeoReplacedEntityRenderer<T extends GeoReplacedEntity, E extends EntityLivingBase>
+    extends RendererLivingEntity implements GeoRenderer<T> {
 
     private static final float VANILLA_MODEL_OFFSET = 24 / 16f + 0.0078125f;
+    private static final Map<Class<? extends Entity>, GeoReplacedEntityRenderer<?, ?>> REPLACED_RENDERERS = new ConcurrentHashMap<>();
 
     protected final GeoModel<T> model;
+    protected final T animatable;
     protected final GeoRenderLayersContainer<T> renderLayers = new GeoRenderLayersContainer<>(this);
     protected float scaleWidth = 1;
     protected float scaleHeight = 1;
 
     private final FloatBuffer currentColor = BufferUtils.createFloatBuffer(4);
-    private T activeEntity;
+    private E activeEntity;
     private ModelPose activePose;
     private float activePartialTicks;
     private float limbSwing;
@@ -50,18 +56,50 @@ public class GeoEntityRenderer<T extends EntityLivingBase & GeoAnimatable> exten
     private float netHeadYaw;
     private float headPitch;
 
-    public GeoEntityRenderer(GeoModel<T> model) {
-        this(model, 0.5f);
+    public GeoReplacedEntityRenderer(GeoModel<T> model, T animatable) {
+        this(model, animatable, 0.5f);
     }
 
-    public GeoEntityRenderer(GeoModel<T> model, float shadowRadius) {
-        this(new DelegatingModel(), model, shadowRadius);
+    public GeoReplacedEntityRenderer(GeoModel<T> model, T animatable, float shadowRadius) {
+        this(new DelegatingModel(), model, animatable, shadowRadius);
     }
 
-    private GeoEntityRenderer(DelegatingModel dummyModel, GeoModel<T> model, float shadowRadius) {
+    private GeoReplacedEntityRenderer(DelegatingModel dummyModel, GeoModel<T> model, T animatable, float shadowRadius) {
         super(dummyModel, shadowRadius);
         this.model = model;
+        this.animatable = animatable;
         dummyModel.renderer = this;
+
+        if (animatable instanceof Entity)
+            throw new IllegalArgumentException("A replaced-entity animatable must not be an Entity instance");
+    }
+
+    /** Registers this renderer for an existing entity class. Call from the physical client only. */
+    public static <T extends GeoReplacedEntity, E extends EntityLivingBase> void registerReplacedEntity(
+        Class<E> entityClass, GeoReplacedEntityRenderer<T, E> renderer) {
+        REPLACED_RENDERERS.put(entityClass, renderer);
+        RenderingRegistry.registerEntityRenderingHandler(entityClass, renderer);
+    }
+
+    /** Returns the shared replacement animatable selected for an entity, including superclass registrations. */
+    public static GeoReplacedEntity getReplacedAnimatable(Entity entity) {
+        if (entity == null) return null;
+
+        Class<?> entityClass = entity.getClass();
+
+        while (Entity.class.isAssignableFrom(entityClass)) {
+            GeoReplacedEntityRenderer<?, ?> renderer = REPLACED_RENDERERS.get(entityClass);
+
+            if (renderer != null) return renderer.getAnimatable();
+
+            entityClass = entityClass.getSuperclass();
+        }
+
+        return null;
+    }
+
+    public T getAnimatable() {
+        return this.animatable;
     }
 
     @Override
@@ -74,7 +112,7 @@ public class GeoEntityRenderer<T extends EntityLivingBase & GeoAnimatable> exten
         return this.renderLayers.getRenderLayers();
     }
 
-    public GeoEntityRenderer<T> addRenderLayer(GeoRenderLayer<T> renderLayer) {
+    public GeoReplacedEntityRenderer<T, E> addRenderLayer(GeoRenderLayer<T> renderLayer) {
         this.renderLayers.addLayer(renderLayer);
 
         return this;
@@ -84,24 +122,23 @@ public class GeoEntityRenderer<T extends EntityLivingBase & GeoAnimatable> exten
         return this.renderLayers.removeLayer(renderLayer);
     }
 
-    public GeoEntityRenderer<T> withScale(float scale) {
+    public GeoReplacedEntityRenderer<T, E> withScale(float scale) {
         return withScale(scale, scale);
     }
 
-    public GeoEntityRenderer<T> withScale(float widthScale, float heightScale) {
+    public GeoReplacedEntityRenderer<T, E> withScale(float widthScale, float heightScale) {
         this.scaleWidth = widthScale;
         this.scaleHeight = heightScale;
 
         return this;
     }
 
-    /** Unique animation id for the rendered entity. */
-    public long getInstanceId(T animatable) {
-        return animatable.getEntityId();
+    public long getInstanceId(T animatable, E replacedEntity) {
+        return replacedEntity.getEntityId();
     }
 
     /** ARGB model tint. */
-    public int getRenderColor(T animatable, float partialTicks) {
+    public int getRenderColor(T animatable, E replacedEntity, float partialTicks) {
         return 0xFFFFFFFF;
     }
 
@@ -111,29 +148,27 @@ public class GeoEntityRenderer<T extends EntityLivingBase & GeoAnimatable> exten
     }
 
     @Override
-    public ResourceLocation getEntityTexture(Entity entity) {
-        return this.model.getTextureResource(cast(entity));
+    protected ResourceLocation getEntityTexture(Entity entity) {
+        return this.model.getTextureResource(this.animatable);
     }
 
     @Override
     protected final void preRenderCallback(EntityLivingBase entity, float partialTicks) {
-        scaleModelForRender(cast(entity), partialTicks, this.scaleWidth, this.scaleHeight);
+        scaleModelForRender(this.animatable, cast(entity), partialTicks, this.scaleWidth, this.scaleHeight);
     }
 
-    /**
-     * Counteracts vanilla ModelBase's inverted axes while applying the renderer scale.
-     * Override and call super to add model-wide render transforms.
-     */
-    protected void scaleModelForRender(T animatable, float partialTicks, float widthScale, float heightScale) {
+    /** Counteracts vanilla ModelBase's inverted axes while applying the renderer scale. */
+    protected void scaleModelForRender(T animatable, E replacedEntity, float partialTicks, float widthScale,
+        float heightScale) {
         GL11.glScalef(-widthScale, -heightScale, widthScale);
     }
 
     @Override
     protected void renderModel(EntityLivingBase entity, float limbSwing, float limbSwingAmount, float ageInTicks,
         float netHeadYaw, float headPitch, float scale) {
-        T animatable = cast(entity);
+        E replacedEntity = cast(entity);
 
-        this.activeEntity = animatable;
+        this.activeEntity = replacedEntity;
         this.activePose = null;
         this.activePartialTicks = ageInTicks - entity.ticksExisted;
         this.limbSwing = limbSwing;
@@ -144,7 +179,7 @@ public class GeoEntityRenderer<T extends EntityLivingBase & GeoAnimatable> exten
 
         if (entity.isInvisible() && entity.isInvisibleToPlayer(Minecraft.getMinecraft().thePlayer)) return;
 
-        int color = getRenderColor(animatable, this.activePartialTicks);
+        int color = getRenderColor(this.animatable, replacedEntity, this.activePartialTicks);
         float red = channel(color, 16);
         float green = channel(color, 8);
         float blue = channel(color, 0);
@@ -156,22 +191,23 @@ public class GeoEntityRenderer<T extends EntityLivingBase & GeoAnimatable> exten
         GL11.glPushMatrix();
 
         try {
-            // RendererLivingEntity translates ModelBase models down by 24 pixels. GeckoLib models use a ground origin.
             GL11.glTranslatef(0, VANILLA_MODEL_OFFSET + 0.01f, 0);
-            renderGeoModel(animatable, red, green, blue, alpha, translucentInvisible || alpha < 1);
+            renderGeoModel(red, green, blue, alpha, translucentInvisible || alpha < 1);
         } finally {
             GL11.glPopMatrix();
         }
     }
 
-    protected void renderGeoModel(T animatable, float red, float green, float blue, float alpha, boolean translucent) {
+    protected void renderGeoModel(float red, float green, float blue, float alpha, boolean translucent) {
+        long instanceId = getInstanceId(this.animatable, this.activeEntity);
+
         if (!translucent) {
             GeoRenderer.super.render(
-                animatable,
-                getInstanceId(animatable),
+                this.animatable,
+                instanceId,
                 this.ageInTicks,
                 this.activePartialTicks,
-                createMolangContext(animatable, this.activePartialTicks),
+                createMolangContext(this.activeEntity, this.activePartialTicks),
                 red,
                 green,
                 blue,
@@ -192,11 +228,11 @@ public class GeoEntityRenderer<T extends EntityLivingBase & GeoAnimatable> exten
             GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
             GL11.glAlphaFunc(GL11.GL_GREATER, 1 / 255f);
             GeoRenderer.super.render(
-                animatable,
-                getInstanceId(animatable),
+                this.animatable,
+                instanceId,
                 this.ageInTicks,
                 this.activePartialTicks,
-                createMolangContext(animatable, this.activePartialTicks),
+                createMolangContext(this.activeEntity, this.activePartialTicks),
                 red,
                 green,
                 blue,
@@ -213,9 +249,11 @@ public class GeoEntityRenderer<T extends EntityLivingBase & GeoAnimatable> exten
     public ModelPose createModelPose(T animatable, long instanceId, double animatableAge, MolangContext molangContext) {
         AnimatableManager<T> manager = animatable.getAnimatableInstanceCache()
             .getManagerForId(instanceId);
-        boolean sitting = animatable.isRiding() && animatable.ridingEntity != null
-            && animatable.ridingEntity.shouldRiderSit();
+        E entity = this.activeEntity;
+        boolean sitting = entity.isRiding() && entity.ridingEntity != null && entity.ridingEntity.shouldRiderSit();
 
+        manager.setAnimatableData(DataTickets.ENTITY, entity);
+        manager.setAnimatableData(DataTickets.POSITION, new GeoVector(entity.posX, entity.posY, entity.posZ));
         manager.setAnimatableData(
             DataTickets.IS_MOVING,
             Math.abs(this.limbSwingAmount) > getMotionAnimThreshold(animatable));
@@ -223,9 +261,10 @@ public class GeoEntityRenderer<T extends EntityLivingBase & GeoAnimatable> exten
         manager.setAnimatableData(DataTickets.LIMB_SWING_AMOUNT, this.limbSwingAmount);
         manager.setAnimatableData(DataTickets.NET_HEAD_YAW, this.netHeadYaw);
         manager.setAnimatableData(DataTickets.HEAD_PITCH, this.headPitch);
-        manager.setAnimatableData(DataTickets.IS_CHILD, animatable.isChild());
+        manager.setAnimatableData(DataTickets.IS_CHILD, entity.isChild());
         manager.setAnimatableData(DataTickets.IS_SITTING, sitting);
-        manager.setAnimatableData(DataTickets.RENDER_COLOR, getRenderColor(animatable, this.activePartialTicks));
+        manager
+            .setAnimatableData(DataTickets.RENDER_COLOR, getRenderColor(animatable, entity, this.activePartialTicks));
 
         ModelPose pose = GeoRenderer.super.createModelPose(animatable, instanceId, animatableAge, molangContext);
 
@@ -234,14 +273,15 @@ public class GeoEntityRenderer<T extends EntityLivingBase & GeoAnimatable> exten
         return pose;
     }
 
-    /** Entity-aware model-pose hook, called after the model's own custom animation hook. */
-    protected void applyRenderPose(T animatable, ModelPose pose, float limbSwing, float limbSwingAmount,
-        float netHeadYaw, float headPitch, float partialTicks) {}
+    /** Replaced-entity-aware model-pose hook, called after the model's custom animation hook. */
+    protected void applyRenderPose(T animatable, E replacedEntity, ModelPose pose, float limbSwing,
+        float limbSwingAmount, float netHeadYaw, float headPitch, float partialTicks) {}
 
     @Override
     public void adjustModelPose(T animatable, ModelPose pose, float partialTicks) {
         applyRenderPose(
             animatable,
+            this.activeEntity,
             pose,
             this.limbSwing,
             this.limbSwingAmount,
@@ -250,40 +290,40 @@ public class GeoEntityRenderer<T extends EntityLivingBase & GeoAnimatable> exten
             partialTicks);
     }
 
-    /** Supplies common Bedrock entity queries. Unknown queries resolve to zero. */
-    protected MolangContext createMolangContext(final T animatable, final float partialTicks) {
-        return variableName -> resolveEntityQuery(animatable, partialTicks, variableName);
+    protected MolangContext createMolangContext(final E replacedEntity, final float partialTicks) {
+        return variableName -> resolveEntityQuery(replacedEntity, partialTicks, variableName);
     }
 
-    protected double resolveEntityQuery(T animatable, float partialTicks, String variableName) {
+    /** Supplies common Bedrock queries from the entity whose renderer is being replaced. */
+    protected double resolveEntityQuery(E entity, float partialTicks, String variableName) {
         String query = Variable.normalizeName(variableName);
 
         switch (query) {
             case "query.is_moving":
-                return Math.abs(this.limbSwingAmount) > getMotionAnimThreshold(animatable) ? 1 : 0;
+                return Math.abs(this.limbSwingAmount) > getMotionAnimThreshold(this.animatable) ? 1 : 0;
             case "query.is_on_ground":
-                return animatable.onGround ? 1 : 0;
+                return entity.onGround ? 1 : 0;
             case "query.is_in_water":
-                return animatable.isInWater() ? 1 : 0;
+                return entity.isInWater() ? 1 : 0;
             case "query.is_on_fire":
-                return animatable.isBurning() ? 1 : 0;
+                return entity.isBurning() ? 1 : 0;
             case "query.is_alive":
-                return animatable.isEntityAlive() ? 1 : 0;
+                return entity.isEntityAlive() ? 1 : 0;
             case "query.health":
-                return animatable.getHealth();
+                return entity.getHealth();
             case "query.max_health":
-                return animatable.getMaxHealth();
+                return entity.getMaxHealth();
             case "query.ground_speed":
             case "query.modified_move_speed":
-                return Math.sqrt(animatable.motionX * animatable.motionX + animatable.motionZ * animatable.motionZ);
+                return Math.sqrt(entity.motionX * entity.motionX + entity.motionZ * entity.motionZ);
             case "query.vertical_speed":
-                return animatable.motionY;
+                return entity.motionY;
             case "query.yaw_speed":
-                return MathHelper.wrapAngleTo180_double(animatable.rotationYaw - animatable.prevRotationYaw);
+                return MathHelper.wrapAngleTo180_double(entity.rotationYaw - entity.prevRotationYaw);
             case "query.life_time":
-                return (animatable.ticksExisted + partialTicks) / 20d;
+                return (entity.ticksExisted + partialTicks) / 20d;
             case "query.time_of_day":
-                return animatable.worldObj == null ? 0 : (animatable.worldObj.getTotalWorldTime() % 24000L) / 24000d;
+                return entity.worldObj == null ? 0 : (entity.worldObj.getTotalWorldTime() % 24000L) / 24000d;
             default:
                 return 0;
         }
@@ -310,8 +350,8 @@ public class GeoEntityRenderer<T extends EntityLivingBase & GeoAnimatable> exten
     }
 
     @SuppressWarnings("unchecked")
-    private T cast(Entity entity) {
-        return (T) entity;
+    private E cast(Entity entity) {
+        return (E) entity;
     }
 
     private static float channel(int color, int shift) {
@@ -320,7 +360,7 @@ public class GeoEntityRenderer<T extends EntityLivingBase & GeoAnimatable> exten
 
     private static final class DelegatingModel extends ModelBase {
 
-        private GeoEntityRenderer<?> renderer;
+        private GeoReplacedEntityRenderer<?, ?> renderer;
 
         @Override
         public void render(Entity entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw,

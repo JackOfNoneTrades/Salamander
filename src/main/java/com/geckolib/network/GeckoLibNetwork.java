@@ -1,13 +1,18 @@
 package com.geckolib.network;
 
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.network.Packet;
+import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.WorldServer;
 
 import org.fentanylsolutions.salamander.Salamander;
 
+import com.geckolib.animatable.GeoReplacedEntity;
 import com.geckolib.animatable.SingletonGeoAnimatable;
 import com.geckolib.cache.SyncedSingletonAnimatableCache;
+import com.geckolib.network.packet.blockentity.BlockEntityAnimTriggerPacket;
+import com.geckolib.network.packet.blockentity.StopTriggeredBlockEntityAnimPacket;
 import com.geckolib.network.packet.entity.EntityAnimTriggerPacket;
 import com.geckolib.network.packet.entity.StopTriggeredEntityAnimPacket;
 import com.geckolib.network.packet.singleton.SingletonAnimTriggerPacket;
@@ -27,6 +32,8 @@ public final class GeckoLibNetwork {
     private static final int STOP_ENTITY_TRIGGER_PACKET_ID = 1;
     private static final int SINGLETON_TRIGGER_PACKET_ID = 2;
     private static final int STOP_SINGLETON_TRIGGER_PACKET_ID = 3;
+    private static final int BLOCK_ENTITY_TRIGGER_PACKET_ID = 4;
+    private static final int STOP_BLOCK_ENTITY_TRIGGER_PACKET_ID = 5;
     private static final SimpleNetworkWrapper CHANNEL = NetworkRegistry.INSTANCE.newSimpleChannel(Salamander.MODID);
 
     private static boolean initialized;
@@ -57,6 +64,16 @@ public final class GeckoLibNetwork {
             StopTriggeredSingletonAnimPacket.class,
             STOP_SINGLETON_TRIGGER_PACKET_ID,
             Side.CLIENT);
+        CHANNEL.registerMessage(
+            BlockEntityAnimTriggerPacket.Handler.class,
+            BlockEntityAnimTriggerPacket.class,
+            BLOCK_ENTITY_TRIGGER_PACKET_ID,
+            Side.CLIENT);
+        CHANNEL.registerMessage(
+            StopTriggeredBlockEntityAnimPacket.Handler.class,
+            StopTriggeredBlockEntityAnimPacket.class,
+            STOP_BLOCK_ENTITY_TRIGGER_PACKET_ID,
+            Side.CLIENT);
     }
 
     public static void triggerEntityAnimation(Entity entity, String controllerName, String animationName) {
@@ -79,6 +96,32 @@ public final class GeckoLibNetwork {
         if (!message.isValid()) throw new IllegalArgumentException("Invalid entity animation stop request");
 
         sendToTrackingAndSelf(entity, message);
+    }
+
+    public static void triggerReplacedEntityAnimation(GeoReplacedEntity animatable, Entity relatedEntity,
+        String controllerName, String animationName) {
+        EntityAnimTriggerPacket message = new EntityAnimTriggerPacket(
+            relatedEntity.getEntityId(),
+            true,
+            controllerName,
+            animationName);
+
+        if (!message.isValid()) throw new IllegalArgumentException("Invalid replaced-entity animation trigger");
+
+        sendToTrackingAndSelf(relatedEntity, message);
+    }
+
+    public static void stopTriggeredReplacedEntityAnimation(GeoReplacedEntity animatable, Entity relatedEntity,
+        String controllerName, String animationName) {
+        StopTriggeredEntityAnimPacket message = new StopTriggeredEntityAnimPacket(
+            relatedEntity.getEntityId(),
+            true,
+            controllerName,
+            animationName);
+
+        if (!message.isValid()) throw new IllegalArgumentException("Invalid replaced-entity animation stop request");
+
+        sendToTrackingAndSelf(relatedEntity, message);
     }
 
     public static void triggerSingletonAnimation(SingletonGeoAnimatable animatable, Entity relatedEntity,
@@ -107,6 +150,33 @@ public final class GeckoLibNetwork {
         sendToTrackingAndSelf(relatedEntity, message);
     }
 
+    public static void triggerBlockEntityAnimation(TileEntity tileEntity, String controllerName, String animationName) {
+        BlockEntityAnimTriggerPacket message = new BlockEntityAnimTriggerPacket(
+            tileEntity.xCoord,
+            tileEntity.yCoord,
+            tileEntity.zCoord,
+            controllerName,
+            animationName);
+
+        if (!message.isValid()) throw new IllegalArgumentException("Invalid block entity animation trigger");
+
+        sendToTrackingChunk(tileEntity, message);
+    }
+
+    public static void stopTriggeredBlockEntityAnimation(TileEntity tileEntity, String controllerName,
+        String animationName) {
+        StopTriggeredBlockEntityAnimPacket message = new StopTriggeredBlockEntityAnimPacket(
+            tileEntity.xCoord,
+            tileEntity.yCoord,
+            tileEntity.zCoord,
+            controllerName,
+            animationName);
+
+        if (!message.isValid()) throw new IllegalArgumentException("Invalid block entity animation stop request");
+
+        sendToTrackingChunk(tileEntity, message);
+    }
+
     private static void sendToTrackingAndSelf(Entity entity, IMessage message) {
         if (!(entity.worldObj instanceof WorldServer)) {
             throw new IllegalArgumentException("Animation packets can only be sent for server entities");
@@ -116,5 +186,20 @@ public final class GeckoLibNetwork {
 
         ((WorldServer) entity.worldObj).getEntityTracker()
             .func_151248_b(entity, packet);
+    }
+
+    private static void sendToTrackingChunk(TileEntity tileEntity, IMessage message) {
+        if (!(tileEntity.getWorldObj() instanceof WorldServer))
+            throw new IllegalArgumentException("Animation packets can only be sent for server block entities");
+
+        WorldServer world = (WorldServer) tileEntity.getWorldObj();
+        int chunkX = tileEntity.xCoord >> 4;
+        int chunkZ = tileEntity.zCoord >> 4;
+
+        for (Object player : world.playerEntities) {
+            if (player instanceof EntityPlayerMP && world.getPlayerManager()
+                .isPlayerWatchingChunk((EntityPlayerMP) player, chunkX, chunkZ))
+                CHANNEL.sendTo(message, (EntityPlayerMP) player);
+        }
     }
 }

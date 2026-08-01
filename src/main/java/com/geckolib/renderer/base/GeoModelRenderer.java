@@ -2,6 +2,7 @@ package com.geckolib.renderer.base;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.Predicate;
 
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
@@ -29,12 +30,18 @@ public final class GeoModelRenderer {
 
     public static void render(BakedGeoModel model, ModelPose pose, GeoVertexConsumer consumer, float red, float green,
         float blue, float alpha) {
+        render(model, pose, bone -> true, consumer, red, green, blue, alpha);
+    }
+
+    /** Emits only geometry belonging to bones accepted by {@code boneFilter}. */
+    public static void render(BakedGeoModel model, ModelPose pose, Predicate<GeoBone> boneFilter,
+        GeoVertexConsumer consumer, float red, float green, float blue, float alpha) {
         if (pose.model() != model) throw new IllegalArgumentException("Model pose belongs to a different baked model");
 
         Matrix4f identity = new Matrix4f();
 
         for (GeoBone bone : model.topLevelBones()) {
-            renderBone(bone, pose, identity, consumer, red, green, blue, alpha);
+            renderBone(bone, pose, identity, boneFilter, consumer, red, green, blue, alpha);
         }
     }
 
@@ -57,14 +64,14 @@ public final class GeoModelRenderer {
         return new GeoRenderTransforms(bones, locators);
     }
 
-    private static void renderBone(GeoBone bone, ModelPose pose, Matrix4f parentMatrix, GeoVertexConsumer consumer,
-        float red, float green, float blue, float alpha) {
+    private static void renderBone(GeoBone bone, ModelPose pose, Matrix4f parentMatrix, Predicate<GeoBone> boneFilter,
+        GeoVertexConsumer consumer, float red, float green, float blue, float alpha) {
         BoneSnapshot snapshot = pose.get(bone);
         Matrix4f boneMatrix = new Matrix4f(parentMatrix);
 
         transformBone(boneMatrix, bone, snapshot);
 
-        if (!snapshot.isHidden() && bone instanceof CuboidGeoBone) {
+        if (boneFilter.test(bone) && !snapshot.isHidden() && bone instanceof CuboidGeoBone) {
             for (GeoCube cube : ((CuboidGeoBone) bone).cubes()) {
                 renderCube(cube, boneMatrix, consumer, red, green, blue, alpha);
             }
@@ -72,7 +79,7 @@ public final class GeoModelRenderer {
 
         if (!snapshot.areChildrenHidden()) {
             for (GeoBone child : bone.children()) {
-                renderBone(child, pose, boneMatrix, consumer, red, green, blue, alpha);
+                renderBone(child, pose, boneMatrix, boneFilter, consumer, red, green, blue, alpha);
             }
         }
     }
