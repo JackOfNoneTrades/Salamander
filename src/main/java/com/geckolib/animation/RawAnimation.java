@@ -76,6 +76,20 @@ public final class RawAnimation {
         return this.animationList.hashCode();
     }
 
+    @Override
+    public String toString() {
+        StringBuilder builder = new StringBuilder("RawAnimation{");
+
+        for (int i = 0; i < this.animationList.size(); i++) {
+            if (i > 0) builder.append(" -> ");
+
+            builder.append(this.animationList.get(i));
+        }
+
+        return builder.append('}')
+            .toString();
+    }
+
     public static final class Stage {
 
         public static final String WAIT = "internal.wait";

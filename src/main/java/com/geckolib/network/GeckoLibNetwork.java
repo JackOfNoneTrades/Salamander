@@ -10,12 +10,19 @@ import org.fentanylsolutions.salamander.Salamander;
 
 import com.geckolib.animatable.GeoReplacedEntity;
 import com.geckolib.animatable.SingletonGeoAnimatable;
+import com.geckolib.animation.RawAnimation;
 import com.geckolib.cache.SyncedSingletonAnimatableCache;
 import com.geckolib.network.packet.blockentity.BlockEntityAnimTriggerPacket;
+import com.geckolib.network.packet.blockentity.StatelessBlockEntityPlayAnimPacket;
+import com.geckolib.network.packet.blockentity.StatelessBlockEntityStopAnimPacket;
 import com.geckolib.network.packet.blockentity.StopTriggeredBlockEntityAnimPacket;
 import com.geckolib.network.packet.entity.EntityAnimTriggerPacket;
+import com.geckolib.network.packet.entity.StatelessEntityPlayAnimPacket;
+import com.geckolib.network.packet.entity.StatelessEntityStopAnimPacket;
 import com.geckolib.network.packet.entity.StopTriggeredEntityAnimPacket;
 import com.geckolib.network.packet.singleton.SingletonAnimTriggerPacket;
+import com.geckolib.network.packet.singleton.StatelessSingletonPlayAnimPacket;
+import com.geckolib.network.packet.singleton.StatelessSingletonStopAnimPacket;
 import com.geckolib.network.packet.singleton.StopTriggeredSingletonAnimPacket;
 
 import cpw.mods.fml.common.network.NetworkRegistry;
@@ -34,6 +41,12 @@ public final class GeckoLibNetwork {
     private static final int STOP_SINGLETON_TRIGGER_PACKET_ID = 3;
     private static final int BLOCK_ENTITY_TRIGGER_PACKET_ID = 4;
     private static final int STOP_BLOCK_ENTITY_TRIGGER_PACKET_ID = 5;
+    private static final int STATELESS_ENTITY_PLAY_PACKET_ID = 6;
+    private static final int STATELESS_ENTITY_STOP_PACKET_ID = 7;
+    private static final int STATELESS_SINGLETON_PLAY_PACKET_ID = 8;
+    private static final int STATELESS_SINGLETON_STOP_PACKET_ID = 9;
+    private static final int STATELESS_BLOCK_ENTITY_PLAY_PACKET_ID = 10;
+    private static final int STATELESS_BLOCK_ENTITY_STOP_PACKET_ID = 11;
     private static final SimpleNetworkWrapper CHANNEL = NetworkRegistry.INSTANCE.newSimpleChannel(Salamander.MODID);
 
     private static boolean initialized;
@@ -73,6 +86,36 @@ public final class GeckoLibNetwork {
             StopTriggeredBlockEntityAnimPacket.Handler.class,
             StopTriggeredBlockEntityAnimPacket.class,
             STOP_BLOCK_ENTITY_TRIGGER_PACKET_ID,
+            Side.CLIENT);
+        CHANNEL.registerMessage(
+            StatelessEntityPlayAnimPacket.Handler.class,
+            StatelessEntityPlayAnimPacket.class,
+            STATELESS_ENTITY_PLAY_PACKET_ID,
+            Side.CLIENT);
+        CHANNEL.registerMessage(
+            StatelessEntityStopAnimPacket.Handler.class,
+            StatelessEntityStopAnimPacket.class,
+            STATELESS_ENTITY_STOP_PACKET_ID,
+            Side.CLIENT);
+        CHANNEL.registerMessage(
+            StatelessSingletonPlayAnimPacket.Handler.class,
+            StatelessSingletonPlayAnimPacket.class,
+            STATELESS_SINGLETON_PLAY_PACKET_ID,
+            Side.CLIENT);
+        CHANNEL.registerMessage(
+            StatelessSingletonStopAnimPacket.Handler.class,
+            StatelessSingletonStopAnimPacket.class,
+            STATELESS_SINGLETON_STOP_PACKET_ID,
+            Side.CLIENT);
+        CHANNEL.registerMessage(
+            StatelessBlockEntityPlayAnimPacket.Handler.class,
+            StatelessBlockEntityPlayAnimPacket.class,
+            STATELESS_BLOCK_ENTITY_PLAY_PACKET_ID,
+            Side.CLIENT);
+        CHANNEL.registerMessage(
+            StatelessBlockEntityStopAnimPacket.Handler.class,
+            StatelessBlockEntityStopAnimPacket.class,
+            STATELESS_BLOCK_ENTITY_STOP_PACKET_ID,
             Side.CLIENT);
     }
 
@@ -173,6 +216,82 @@ public final class GeckoLibNetwork {
             animationName);
 
         if (!message.isValid()) throw new IllegalArgumentException("Invalid block entity animation stop request");
+
+        sendToTrackingChunk(tileEntity, message);
+    }
+
+    public static void playStatelessEntityAnimation(Entity entity, boolean replacedEntity, RawAnimation animation) {
+        playStatelessEntityAnimation(entity, entity.getEntityId(), replacedEntity, animation);
+    }
+
+    public static void playStatelessEntityAnimation(Entity trackingEntity, int entityId, boolean replacedEntity,
+        RawAnimation animation) {
+        StatelessEntityPlayAnimPacket message = new StatelessEntityPlayAnimPacket(entityId, replacedEntity, animation);
+
+        if (!message.isValid()) throw new IllegalArgumentException("Invalid stateless entity animation");
+
+        sendToTrackingAndSelf(trackingEntity, message);
+    }
+
+    public static void stopStatelessEntityAnimation(Entity entity, boolean replacedEntity, String animation) {
+        stopStatelessEntityAnimation(entity, entity.getEntityId(), replacedEntity, animation);
+    }
+
+    public static void stopStatelessEntityAnimation(Entity trackingEntity, int entityId, boolean replacedEntity,
+        String animation) {
+        StatelessEntityStopAnimPacket message = new StatelessEntityStopAnimPacket(entityId, replacedEntity, animation);
+
+        if (!message.isValid()) throw new IllegalArgumentException("Invalid stateless entity animation stop request");
+
+        sendToTrackingAndSelf(trackingEntity, message);
+    }
+
+    public static void playStatelessSingletonAnimation(SingletonGeoAnimatable animatable, Entity relatedEntity,
+        long instanceId, RawAnimation animation) {
+        StatelessSingletonPlayAnimPacket message = new StatelessSingletonPlayAnimPacket(
+            SyncedSingletonAnimatableCache.getOrCreateId(animatable),
+            instanceId,
+            animation);
+
+        if (!message.isValid()) throw new IllegalArgumentException("Invalid stateless singleton animation");
+
+        sendToTrackingAndSelf(relatedEntity, message);
+    }
+
+    public static void stopStatelessSingletonAnimation(SingletonGeoAnimatable animatable, Entity relatedEntity,
+        long instanceId, String animation) {
+        StatelessSingletonStopAnimPacket message = new StatelessSingletonStopAnimPacket(
+            SyncedSingletonAnimatableCache.getOrCreateId(animatable),
+            instanceId,
+            animation);
+
+        if (!message.isValid())
+            throw new IllegalArgumentException("Invalid stateless singleton animation stop request");
+
+        sendToTrackingAndSelf(relatedEntity, message);
+    }
+
+    public static void playStatelessBlockEntityAnimation(TileEntity tileEntity, RawAnimation animation) {
+        StatelessBlockEntityPlayAnimPacket message = new StatelessBlockEntityPlayAnimPacket(
+            tileEntity.xCoord,
+            tileEntity.yCoord,
+            tileEntity.zCoord,
+            animation);
+
+        if (!message.isValid()) throw new IllegalArgumentException("Invalid stateless block entity animation");
+
+        sendToTrackingChunk(tileEntity, message);
+    }
+
+    public static void stopStatelessBlockEntityAnimation(TileEntity tileEntity, String animation) {
+        StatelessBlockEntityStopAnimPacket message = new StatelessBlockEntityStopAnimPacket(
+            tileEntity.xCoord,
+            tileEntity.yCoord,
+            tileEntity.zCoord,
+            animation);
+
+        if (!message.isValid())
+            throw new IllegalArgumentException("Invalid stateless block entity animation stop request");
 
         sendToTrackingChunk(tileEntity, message);
     }
