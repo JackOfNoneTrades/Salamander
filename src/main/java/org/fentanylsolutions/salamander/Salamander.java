@@ -22,6 +22,9 @@ public class Salamander {
     public static final String MODGROUP = "org.fentanylsolutions";
     public static final Logger LOG = LogManager.getLogger(MODID);
 
+    @Mod.Instance(MODID)
+    public static Salamander instance;
+
     @SidedProxy(
         clientSide = MODGROUP + "." + MODID + ".ClientProxy",
         serverSide = MODGROUP + "." + MODID + ".CommonProxy")

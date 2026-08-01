@@ -1,15 +1,28 @@
 package org.fentanylsolutions.salamander;
 
+import org.fentanylsolutions.salamander.config.DebugConfig;
+import org.fentanylsolutions.salamander.debug.DebugContent;
+
 import com.geckolib.animation.RawAnimation;
 import com.geckolib.network.GeckoLibNetwork;
+import com.gtnewhorizon.gtnhlib.config.ConfigException;
+import com.gtnewhorizon.gtnhlib.config.ConfigurationManager;
 
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 
 public class CommonProxy {
 
     public void preInit(FMLPreInitializationEvent event) {
+        try {
+            ConfigurationManager.registerConfig(DebugConfig.class);
+        } catch (ConfigException exception) {
+            throw new IllegalStateException("Unable to register Salamander configuration", exception);
+        }
+
         Salamander.LOG.info("Loading {} {}", Salamander.MODNAME, Tags.VERSION);
         GeckoLibNetwork.init();
+
+        if (DebugConfig.debugMode) DebugContent.register();
     }
 
     public void handleEntityAnimationTrigger(int entityId, boolean replacedEntity, String controllerName,

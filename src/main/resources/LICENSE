@@ -1,6 +1,8 @@
 Salamander is MIT licensed except for files marked SPDX-License-Identifier:
-LGPL-3.0-only. Those Citadel-derived compatibility files are licensed under
-the GNU Lesser General Public License v3.0 in LICENSE-CITADEL.
+LGPL-3.0-only and the identified Alex's Mobs and Ice and Fire debug fixtures.
+Those files and assets are licensed under the GNU Lesser General Public
+License v3.0 in LICENSE-CITADEL. Bundled GeckoLib Unofficial debug assets retain
+their original MIT license in LICENSE-GECKOLIB-UNOFFICIAL.
 
 MIT License
 

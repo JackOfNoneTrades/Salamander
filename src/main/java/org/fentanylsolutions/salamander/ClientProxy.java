@@ -5,6 +5,9 @@ import net.minecraft.client.resources.IReloadableResourceManager;
 import net.minecraft.entity.Entity;
 import net.minecraft.tileentity.TileEntity;
 
+import org.fentanylsolutions.salamander.config.DebugConfig;
+import org.fentanylsolutions.salamander.debug.client.DebugClientContent;
+
 import com.geckolib.animatable.GeoAnimatable;
 import com.geckolib.animatable.GeoBlockEntity;
 import com.geckolib.animatable.GeoEntity;
@@ -35,6 +38,8 @@ public class ClientProxy extends CommonProxy {
 
         ((IReloadableResourceManager) Minecraft.getMinecraft()
             .getResourceManager()).registerReloadListener(GeckoLibResourceReloadListener.INSTANCE);
+
+        if (DebugConfig.debugMode) DebugClientContent.register();
     }
 
     @Override

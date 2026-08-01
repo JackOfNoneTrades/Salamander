@@ -1,0 +1,17 @@
+Salamander debug fixture provenance
+
+The GeckoLib JSON models, animations, and matching textures under
+assets/salamander/geckolib/**/debug and assets/salamander/textures/debug are
+adapted from GeckoLib Unofficial 1.7.10 commit
+9e8be5a5e617fe8cbfd0366b75a319663b038e6c and retain its MIT license in
+LICENSE-GECKOLIB-UNOFFICIAL, except as identified below.
+
+assets/salamander/textures/debug/citadel_fly.png and the corresponding model
+structure in DebugCitadelFlyModel are adapted from Alex's Mobs commit
+09755dade2cfbdf14839e026d3af446f9d3ff843 under LGPLv3.
+
+assets/salamander/models/tabula/fire_dragon.tbl and
+assets/salamander/textures/debug/citadel_fire_dragon.png come from Ice and Fire
+1.18.2 commit 02b2922003cbce3c67dad55dfea79acf1721e0db under LGPLv3.
+
+See LICENSE-CITADEL for the LGPLv3 license text.

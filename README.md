@@ -26,15 +26,24 @@
 
 `./gradlew build`
 
+## Debug models
+
+Set `debug.debugMode=true` in `config/salamander/salamander.cfg` on the client and server, then restart. The sampler cycles through the creeper, bat, render-layer, NPC, magma-spider, and jester models when right-clicked; sneak-right-click to go backward.
+
+* `/summon salamander.debug_model ~ ~ ~`
+* `/summon salamander.debug_citadel_fly ~ ~ ~`
+* `/summon salamander.debug_citadel_dragon ~ ~ ~`
+
 ## Credits
 
 * The [GeckoLib](https://github.com/bernie-g/geckolib) contributors
 * Citadel compatibility code is derived from [Citadel](https://github.com/AlexModGuy/Citadel) and is licensed under LGPLv3
+* Debug fixtures use assets from GeckoLib Unofficial, Alex's Mobs, and Ice and Fire under their original licenses
 * The [GTNewHorizons](https://github.com/GTNewHorizons) tooling
 
 ## License
 
-`MIT`, except the Citadel-derived compatibility code (`LGPLv3`)
+`MIT`, except the Citadel-derived compatibility code and identified debug fixtures (`LGPLv3`)
 
 ## Buy me creatine
 

@@ -9,7 +9,7 @@
 		"url": "https://github.com/JackOfNoneTrades/Salamander",
 		"updateUrl": "",
 		"authorList": ["JackOfNoneTrades"],
-		"credits": "GeckoLib, Citadel, and the GTNewHorizons examplemod",
+		"credits": "GeckoLib, Citadel, Alex's Mobs, Ice and Fire, and the GTNewHorizons tooling",
 		"logoFile": "assets/${modId}/logo.png",
 		"screenshots": [],
 		"parent": "",
