@@ -3,6 +3,7 @@ package com.geckolib.model;
 import net.minecraft.util.ResourceLocation;
 
 import com.geckolib.animatable.GeoAnimatable;
+import com.geckolib.animation.state.ModelPose;
 import com.geckolib.cache.GeckoLibResources;
 import com.geckolib.cache.animation.Animation;
 import com.geckolib.cache.animation.BakedAnimations;
@@ -20,6 +21,14 @@ public abstract class GeoModel<T extends GeoAnimatable> {
     public ResourceLocation[] getAnimationResourceFallbacks(T animatable) {
         return new ResourceLocation[0];
     }
+
+    /**
+     * Applies render-specific bone changes after controller animations have been evaluated.
+     *
+     * <p>
+     * Changes belong in the supplied per-render pose, never in the immutable baked model.
+     */
+    public void setCustomAnimations(T animatable, long instanceId, ModelPose pose, float partialTicks) {}
 
     public BakedGeoModel getBakedModel(ResourceLocation location) {
         return GeckoLibResources.getBakedModels()

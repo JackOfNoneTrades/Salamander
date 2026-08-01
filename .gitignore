@@ -5,6 +5,7 @@
 /run/
 /build/
 /docs/
+/dev/
 /eclipse/
 .classpath
 .project

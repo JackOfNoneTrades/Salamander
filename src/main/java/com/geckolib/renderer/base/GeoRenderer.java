@@ -18,81 +18,94 @@ import com.geckolib.model.GeoModel;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 
-/** Base client renderer for immutable GeckoLib models. */
+/**
+ * Base client renderer contract for immutable GeckoLib models.
+ *
+ * <p>
+ * This is an interface so renderers can retain the appropriate vanilla renderer superclass and lifecycle.
+ */
 @SideOnly(Side.CLIENT)
-public abstract class GeoRenderer<T extends GeoAnimatable> {
+public interface GeoRenderer<T extends GeoAnimatable> {
 
-    private final GeoModel<T> geoModel;
+    GeoModel<T> getGeoModel();
 
-    protected GeoRenderer(GeoModel<T> geoModel) {
-        this.geoModel = geoModel;
-    }
-
-    public GeoModel<T> getGeoModel() {
-        return this.geoModel;
-    }
-
-    public ModelPose createModelPose(T animatable, long instanceId, double animatableAge, MolangContext molangContext) {
-        BakedGeoModel model = this.geoModel.getBakedModel(animatable);
-        BakedAnimations animations = this.geoModel.getBakedAnimations(animatable);
+    default ModelPose createModelPose(T animatable, long instanceId, double animatableAge,
+        MolangContext molangContext) {
+        GeoModel<T> geoModel = getGeoModel();
+        BakedGeoModel model = geoModel.getBakedModel(animatable);
+        BakedAnimations animations = geoModel.getBakedAnimations(animatable);
         AnimatableManager<T> manager = animatable.getAnimatableInstanceCache()
             .getManagerForId(instanceId);
 
         return AnimationProcessor.createModelPose(animatable, manager, animations, model, animatableAge, molangContext);
     }
 
-    public void render(T animatable, long instanceId, double animatableAge, float partialTicks,
+    default void render(T animatable, long instanceId, double animatableAge, float partialTicks,
         MolangContext molangContext, float red, float green, float blue, float alpha) {
         ModelPose pose = createModelPose(animatable, instanceId, animatableAge, molangContext);
 
+        getGeoModel().setCustomAnimations(animatable, instanceId, pose, partialTicks);
         adjustModelPose(animatable, pose, partialTicks);
-        Minecraft.getMinecraft().renderEngine.bindTexture(this.geoModel.getTextureResource(animatable));
+        Minecraft.getMinecraft().renderEngine.bindTexture(getGeoModel().getTextureResource(animatable));
         renderModel(animatable, pose, partialTicks, red, green, blue, alpha);
     }
 
-    protected void adjustModelPose(T animatable, ModelPose pose, float partialTicks) {}
+    default void adjustModelPose(T animatable, ModelPose pose, float partialTicks) {}
 
-    protected void preRender(T animatable, ModelPose pose, float partialTicks) {}
+    default void preRender(T animatable, ModelPose pose, float partialTicks) {}
 
-    protected void postRender(T animatable, ModelPose pose, float partialTicks) {}
+    default void postRender(T animatable, ModelPose pose, float partialTicks) {}
 
-    protected void renderModel(T animatable, ModelPose pose, float partialTicks, float red, float green, float blue,
+    default void renderModel(T animatable, ModelPose pose, float partialTicks, float red, float green, float blue,
         float alpha) {
         boolean textureEnabled = GL11.glIsEnabled(GL11.GL_TEXTURE_2D);
         boolean rescaleNormalEnabled = GL11.glIsEnabled(GL12.GL_RESCALE_NORMAL);
-        Tessellator tessellator = Tessellator.instance;
-        boolean drawing = false;
 
         try {
             GL11.glEnable(GL11.GL_TEXTURE_2D);
             GL11.glEnable(GL12.GL_RESCALE_NORMAL);
             preRender(animatable, pose, partialTicks);
-            tessellator.startDrawingQuads();
-            drawing = true;
-            GeoModelRenderer
-                .render(pose.model(), pose, new TessellatorVertexConsumer(tessellator), red, green, blue, alpha);
-            drawing = false;
-            tessellator.draw();
+            renderModelGeometry(pose, red, green, blue, alpha);
             postRender(animatable, pose, partialTicks);
         } finally {
-            if (drawing) tessellator.draw();
-
             setEnabled(GL11.GL_TEXTURE_2D, textureEnabled);
             setEnabled(GL12.GL_RESCALE_NORMAL, rescaleNormalEnabled);
             GL11.glColor4f(1, 1, 1, 1);
         }
     }
 
-    private static void setEnabled(int capability, boolean enabled) {
+    /**
+     * Emits an already-posed model without binding a texture or changing GL capabilities.
+     *
+     * <p>
+     * Entity renderers use this for vanilla's hurt and color-multiplier passes.
+     */
+    default void renderModelGeometry(ModelPose pose, float red, float green, float blue, float alpha) {
+        Tessellator tessellator = Tessellator.instance;
+        boolean drawing = false;
+
+        try {
+            tessellator.startDrawingQuads();
+            drawing = true;
+            GeoModelRenderer
+                .render(pose.model(), pose, new TessellatorVertexConsumer(tessellator), red, green, blue, alpha);
+            drawing = false;
+            tessellator.draw();
+        } finally {
+            if (drawing) tessellator.draw();
+        }
+    }
+
+    static void setEnabled(int capability, boolean enabled) {
         if (enabled) GL11.glEnable(capability);
         else GL11.glDisable(capability);
     }
 
-    private static final class TessellatorVertexConsumer implements GeoVertexConsumer {
+    final class TessellatorVertexConsumer implements GeoVertexConsumer {
 
         private final Tessellator tessellator;
 
-        private TessellatorVertexConsumer(Tessellator tessellator) {
+        public TessellatorVertexConsumer(Tessellator tessellator) {
             this.tessellator = tessellator;
         }
 

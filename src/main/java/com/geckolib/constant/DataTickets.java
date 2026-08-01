@@ -13,6 +13,13 @@ public final class DataTickets {
     public static final DataTicket<Float> PARTIAL_TICK = DataTicket.create("partial_tick", Float.class);
     public static final DataTicket<Double> TICK = DataTicket.create("tick", Double.class);
     public static final DataTicket<Boolean> IS_MOVING = DataTicket.create("is_moving", Boolean.class);
+    public static final DataTicket<Float> LIMB_SWING = DataTicket.create("limb_swing", Float.class);
+    public static final DataTicket<Float> LIMB_SWING_AMOUNT = DataTicket.create("limb_swing_amount", Float.class);
+    public static final DataTicket<Float> NET_HEAD_YAW = DataTicket.create("net_head_yaw", Float.class);
+    public static final DataTicket<Float> HEAD_PITCH = DataTicket.create("head_pitch", Float.class);
+    public static final DataTicket<Boolean> IS_CHILD = DataTicket.create("is_child", Boolean.class);
+    public static final DataTicket<Boolean> IS_SITTING = DataTicket.create("is_sitting", Boolean.class);
+    public static final DataTicket<Integer> RENDER_COLOR = DataTicket.create("render_color", Integer.class);
     public static final DataTicket<AnimatableManager<? extends GeoAnimatable>> ANIMATABLE_MANAGER = DataTicket
         .create("animatable_manager", new TypeToken<AnimatableManager<? extends GeoAnimatable>>() {});
 
