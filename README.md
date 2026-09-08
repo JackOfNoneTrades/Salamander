@@ -26,17 +26,6 @@
 
 `./gradlew build`
 
-### Renderer regression checks
-
-`build` runs the unit suite on both the build JVM and Java 8. The GL buffer tests use LWJGL 2's real
-buffer-size guard without needing a display. Current-color query buffers must hold **16 floats**, even
-though RGBA uses only four: legacy `glGetFloat` checks the maximum possible result size before calling
-OpenGL. This applies to snapshots, entity/replaced-entity rendering and armor color queries.
-
-For release testing, also launch a packaged client with Java 8 and LWJGL 2.9.4, render modeled items in
-an actual inventory, and verify that snapshot capture/restore preserves all four color channels without
-GL errors. Repeat with lwjgl3ify; a successful LWJGL 3 run alone cannot catch LWJGL 2 buffer contracts.
-
 ## Debug models
 
 Set `debug.debugMode=true` in `config/salamander/salamander.cfg` on the client and server, then restart. The sampler cycles through the creeper, bat, render-layer, NPC, magma-spider, and jester models when right-clicked; sneak-right-click to go backward.
