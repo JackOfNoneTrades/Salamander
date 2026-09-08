@@ -12,8 +12,9 @@ import org.lwjgl.opengl.GL13;
 /** Narrow explicit state snapshot used to isolate addon-controlled rendering without glPushAttrib. */
 public final class GlStateSnapshot {
 
+    // LWJGL 2 glGetFloat requires room for the largest query (a 4x4 matrix), even for RGBA.
     private static final ThreadLocal<FloatBuffer> COLOR_BUFFER = ThreadLocal
-        .withInitial(() -> BufferUtils.createFloatBuffer(4));
+        .withInitial(() -> BufferUtils.createFloatBuffer(16));
 
     private final boolean alphaTest = GL11.glIsEnabled(GL11.GL_ALPHA_TEST);
     private final boolean blend = GL11.glIsEnabled(GL11.GL_BLEND);

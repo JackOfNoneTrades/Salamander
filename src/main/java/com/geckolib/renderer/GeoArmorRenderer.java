@@ -675,7 +675,8 @@ public class GeoArmorRenderer<T extends ItemArmor & GeoItem> extends ModelBiped 
     }
 
     private float[] currentGlColor() {
-        if (this.currentColor == null) this.currentColor = BufferUtils.createFloatBuffer(4);
+        // LWJGL 2 requires 16 floats for glGetFloat, even when querying only RGBA.
+        if (this.currentColor == null) this.currentColor = BufferUtils.createFloatBuffer(16);
 
         this.currentColor.clear();
         GL11.glGetFloat(GL11.GL_CURRENT_COLOR, this.currentColor);

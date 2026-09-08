@@ -46,7 +46,8 @@ public class GeoReplacedEntityRenderer<T extends GeoReplacedEntity, E extends En
     protected float scaleWidth = 1;
     protected float scaleHeight = 1;
 
-    private final FloatBuffer currentColor = BufferUtils.createFloatBuffer(4);
+    // LWJGL 2 requires 16 floats for glGetFloat, even when querying only RGBA.
+    private final FloatBuffer currentColor = BufferUtils.createFloatBuffer(16);
     private E activeEntity;
     private ModelPose activePose;
     private float activePartialTicks;

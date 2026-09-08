@@ -55,5 +55,7 @@ dependencies {
 
     // Test
     testImplementation("junit:junit:4.13.2")
+    // Exercise the real legacy glGetFloat buffer guard without a native GL context.
+    testRuntimeOnly("org.lwjgl.lwjgl:lwjgl:2.9.4-nightly-20150209") { transitive = false }
     testImplementation("org.joml:joml:1.10.8") // GTNHLib provides this in game through its dependency loader
 }
