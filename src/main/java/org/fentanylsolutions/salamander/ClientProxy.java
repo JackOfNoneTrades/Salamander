@@ -5,6 +5,10 @@ import net.minecraft.client.resources.IReloadableResourceManager;
 import net.minecraft.entity.Entity;
 import net.minecraft.tileentity.TileEntity;
 
+import org.fentanylsolutions.salamander.cem.client.CemClient;
+import org.fentanylsolutions.salamander.cem.client.CemClientSignals;
+import org.fentanylsolutions.salamander.cem.client.CemResources;
+import org.fentanylsolutions.salamander.cem.network.CemSignalPacket;
 import org.fentanylsolutions.salamander.config.DebugConfig;
 import org.fentanylsolutions.salamander.debug.client.DebugClientContent;
 
@@ -24,6 +28,7 @@ import com.geckolib.renderer.GeoReplacedEntityRenderer;
 import com.github.alexthe666.citadel.animation.Animation;
 import com.github.alexthe666.citadel.animation.IAnimatedEntity;
 
+import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 
 public class ClientProxy extends CommonProxy {
@@ -38,6 +43,16 @@ public class ClientProxy extends CommonProxy {
 
         ((IReloadableResourceManager) Minecraft.getMinecraft()
             .getResourceManager()).registerReloadListener(GeckoLibResourceReloadListener.INSTANCE);
+
+        org.fentanylsolutions.salamander.cem.client.CemBeds.register();
+        ((IReloadableResourceManager) Minecraft.getMinecraft()
+            .getResourceManager()).registerReloadListener(CemResources.INSTANCE);
+        FMLCommonHandler.instance()
+            .bus()
+            .register(CemClient.INSTANCE);
+        FMLCommonHandler.instance()
+            .bus()
+            .register(CemClientSignals.INSTANCE);
 
         if (DebugConfig.debugMode) DebugClientContent.register();
     }
@@ -228,6 +243,24 @@ public class ClientProxy extends CommonProxy {
     private static Entity getClientEntity(int entityId) {
         return Minecraft.getMinecraft().theWorld == null ? null
             : Minecraft.getMinecraft().theWorld.getEntityByID(entityId);
+    }
+
+    @Override
+    public void handleCemRegistration(Object manager, boolean registered) {
+        Minecraft.getMinecraft()
+            .func_152344_a(() -> CemClientSignals.registration(manager, registered));
+    }
+
+    @Override
+    public void handleCemHello(Object handler, boolean enabled) {
+        Minecraft.getMinecraft()
+            .func_152344_a(() -> CemClientSignals.hello(handler, enabled));
+    }
+
+    @Override
+    public void handleCemSignal(Object handler, CemSignalPacket packet) {
+        Minecraft.getMinecraft()
+            .func_152344_a(() -> CemClientSignals.receive(handler, packet));
     }
 
     private static TileEntity getClientBlockEntity(int x, int y, int z) {

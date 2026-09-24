@@ -1,6 +1,5 @@
 package org.fentanylsolutions.salamander.core;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -23,6 +22,24 @@ public class LateMixinLoader implements ILateMixinLoader {
 
     @Override
     public List<String> getMixins(Set<String> loadedMods) {
-        return Collections.emptyList();
+        java.util.List<String> mixins = new java.util.ArrayList<>();
+        if (cpw.mods.fml.relauncher.FMLLaunchHandler.side()
+            .isClient() && loadedMods.contains("etfuturum")) {
+            mixins.add("etfuturum.MixinModelFoxCem");
+            mixins.add("etfuturum.MixinBrownMooshroomRendererCem");
+            mixins.add("etfuturum.MixinEntityFoxCemInputs");
+            mixins.add("etfuturum.MixinEntityBeeCemInputs");
+            mixins.add("etfuturum.MixinModelBeeCem");
+            mixins.add("etfuturum.MixinModelRabbitCem");
+            mixins.add("etfuturum.MixinModelEndermiteCem");
+            mixins.add("etfuturum.MixinModelShulkerCem");
+            mixins.add("etfuturum.MixinModelShulkerBulletCem");
+            mixins.add("etfuturum.MixinModelArmorStandCem");
+            mixins.add("etfuturum.MixinModelNewBoatCem");
+            mixins.add("etfuturum.MixinChestBoatRendererCem");
+            mixins.add("etfuturum.MixinModelBannerCem");
+            mixins.add("etfuturum.MixinModelHeadCem");
+        }
+        return mixins;
     }
 }

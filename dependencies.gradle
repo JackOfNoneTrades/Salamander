@@ -38,6 +38,7 @@ dependencies {
     runtimeOnlyNonPublishable("com.github.GTNewHorizons:Hodgepodge:2.7.200:dev")
     runtimeOnlyNonPublishable("com.github.GTNewHorizons:NotEnoughItems:2.8.130-GTNH:dev")
     runtimeOnlyNonPublishable("com.github.GTNewHorizons:Angelica:2.2.11:dev")
+    runtimeOnlyNonPublishable("ganymedes01.etfuturum:Et-Futurum-Requiem:2.6.59-GTNH:dev")
     runtimeOnlyNonPublishable(rfg.deobf("maven.modrinth:bugtorch:1.2.14"))
     runtimeOnlyNonPublishable(rfg.deobf("curse.maven:catalogue-vintage-1465746:8384975")) // 1.0.8-1.7.10
     runtimeOnlyNonPublishable("org.fentanylsolutions.wawelauth:WawelAuth:1.0.5:dev")

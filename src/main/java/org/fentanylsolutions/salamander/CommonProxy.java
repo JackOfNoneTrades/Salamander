@@ -1,5 +1,8 @@
 package org.fentanylsolutions.salamander;
 
+import org.fentanylsolutions.salamander.cem.network.CemNetwork;
+import org.fentanylsolutions.salamander.cem.network.CemSignalPacket;
+import org.fentanylsolutions.salamander.config.CemConfig;
 import org.fentanylsolutions.salamander.config.DebugConfig;
 import org.fentanylsolutions.salamander.debug.DebugContent;
 
@@ -15,12 +18,14 @@ public class CommonProxy {
     public void preInit(FMLPreInitializationEvent event) {
         try {
             ConfigurationManager.registerConfig(DebugConfig.class);
+            ConfigurationManager.registerConfig(CemConfig.class);
         } catch (ConfigException exception) {
             throw new IllegalStateException("Unable to register Salamander configuration", exception);
         }
 
         Salamander.LOG.info("Loading {} {}", Salamander.MODNAME, Tags.VERSION);
         GeckoLibNetwork.init();
+        CemNetwork.init();
 
         if (DebugConfig.debugMode) DebugContent.register();
     }
@@ -55,4 +60,10 @@ public class CommonProxy {
     public void handleStatelessBlockEntityAnimationStop(int x, int y, int z, String animation) {}
 
     public void handleCitadelAnimation(int entityId, int animationIndex) {}
+
+    public void handleCemRegistration(Object manager, boolean registered) {}
+
+    public void handleCemHello(Object handler, boolean enabled) {}
+
+    public void handleCemSignal(Object handler, CemSignalPacket packet) {}
 }
