@@ -31,6 +31,15 @@ public class CemExpressionTest {
     }
 
     @Test
+    public void angleWrappingHandlesNegativeTurnsAndTheHalfTurnBoundary() {
+        assertEquals(-Math.PI, evaluate("wraprad(pi)"), 1e-8);
+        assertEquals(-Math.PI, evaluate("wraprad(-3*pi)"), 1e-8);
+        assertEquals(Math.PI / 2, evaluate("wraprad(-7*pi/2)"), 1e-8);
+        assertEquals(-180, evaluate("wrapdeg(540)"), 0);
+        assertEquals(90, evaluate("wrapdeg(-630)"), 0);
+    }
+
+    @Test
     public void nativeFloatPoseComparisonsDoNotInventGrazingOrMissExactAngles() {
         // A modern foal's baked neck pivot and a native leg angle widen from floats at the API boundary.
         assertEquals(0, evaluate("11.110297203063965 > 4+7.110297"), 0);

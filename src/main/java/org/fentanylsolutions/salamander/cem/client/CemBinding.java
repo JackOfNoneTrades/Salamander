@@ -85,11 +85,11 @@ public final class CemBinding {
         if (model instanceof ModelBiped) {
             virtual("left_ear", "head");
             virtual("right_ear", "head");
-            virtual("jacket", "body");
-            virtual("left_sleeve", "left_arm");
-            virtual("right_sleeve", "right_arm");
-            virtual("left_pants", "left_leg");
-            virtual("right_pants", "right_leg");
+            virtual("jacket", CemPlayers.registered(model) ? "root" : "body");
+            virtual("left_sleeve", CemPlayers.registered(model) ? "root" : "left_arm");
+            virtual("right_sleeve", CemPlayers.registered(model) ? "root" : "right_arm");
+            virtual("left_pants", CemPlayers.registered(model) ? "root" : "left_leg");
+            virtual("right_pants", CemPlayers.registered(model) ? "root" : "right_leg");
         }
         if (model.getClass()
             .getName()
@@ -210,6 +210,14 @@ public final class CemBinding {
             CemModel.Node node = model.originalParts.get(name);
             if (node != null && !selected.containsKey(name)) pose[node.index * CemModel.STRIDE + 9] = chestBoat ? 1 : 0;
         }
+    }
+
+    /** Player overlays are independent CEM slots. Older packs animate them explicitly; newer ones inherit. */
+    public void playerLayers(CemModel.Instance instance, boolean staticPose) {
+        if (!CemPlayers.registered(nativeModel)) return;
+        for (String[] pair : new String[][] { { "head", "headwear" }, { "body", "jacket" },
+            { "right_arm", "right_sleeve" }, { "left_arm", "left_sleeve" }, { "right_leg", "right_pants" },
+            { "left_leg", "left_pants" } }) instance.followPose(pair[0], pair[1], staticPose);
     }
 
     /** Old models such as dragons and crystals reuse the same field for multiple named CEM parts. */

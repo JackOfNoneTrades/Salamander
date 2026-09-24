@@ -19,7 +19,7 @@ import com.geckolib.renderer.GeoArmorRenderer;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 
-/** Adds registered GeckoLib chest-armor geometry after vanilla renders a first-person arm. */
+/** Scopes player CEM rendering and adds registered GeckoLib armor to the first-person arm. */
 @Mixin(RenderPlayer.class)
 public abstract class MixinRenderPlayer {
 
@@ -38,6 +38,13 @@ public abstract class MixinRenderPlayer {
     private void salamander$cemHand(ModelRenderer arm, float scale, Operation<Void> original, EntityPlayer player) {
         CemPlayers.register(modelBipedMain);
         if (!CemRuntime.firstPersonArm(modelBipedMain, player, scale)) original.call(arm, scale);
+    }
+
+    @WrapOperation(
+        method = "renderEquippedItems(Lnet/minecraft/client/entity/AbstractClientPlayer;F)V",
+        at = @At(value = "INVOKE", target = "Lnet/minecraft/client/model/ModelBiped;renderCloak(F)V"))
+    private void salamander$cemCape(ModelBiped model, float scale, Operation<Void> original) {
+        CemRuntime.playerCape(model, scale, () -> original.call(model, scale));
     }
 
     @Inject(method = "renderFirstPersonArm", at = @At("TAIL"))

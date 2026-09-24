@@ -22,6 +22,7 @@ import org.fentanylsolutions.salamander.config.CemConfig;
 public final class CemRuntime {
 
     private static final Map<ModelBase, CemBinding> BINDINGS = new IdentityHashMap<>();
+    private static final Map<ModelBase, CemBinding> CAPES = new IdentityHashMap<>();
     private static Subject subject;
     private static Draw draw;
     private static ResourceLocation texture;
@@ -77,6 +78,7 @@ public final class CemRuntime {
 
     public static void clear() {
         BINDINGS.clear();
+        CAPES.clear();
         subject = null;
         draw = null;
     }
@@ -185,7 +187,9 @@ public final class CemRuntime {
             hand = new Draw(binding, selection.entry, player, 0, 0, 0, 0, 0, 0, texture, true);
             hand.extras = true;
             draw = hand;
-            return renderPart(hand, "right_arm", scale, false);
+            boolean rendered = renderPart(hand, "right_arm", scale, false);
+            renderPart(hand, "right_sleeve", scale, false);
+            return rendered;
         } catch (Exception exception) {
             if (hand != null) CemResources.INSTANCE.fail(hand.entry.model, exception);
             return false;
@@ -193,6 +197,67 @@ public final class CemRuntime {
             rendering = false;
             draw = previousDraw;
             leave(previousSubject);
+        }
+    }
+
+    /** The native cape call includes legacy cape physics in GL; pack capes define their own pose. */
+    public static void playerCape(net.minecraft.client.model.ModelBiped model, float scale, Runnable nativeRender) {
+        Draw body = subject == null ? null : subject.primaryDraw;
+        Draw previous = draw;
+        boolean previousRendering = rendering;
+        CemResources.Entry capeEntry = null;
+        org.lwjgl.opengl.GL11.glPushMatrix();
+        try {
+            if (CemConfig.enabled && CemConfig.playerModels && body != null && CemPlayers.model(body.object, model)) {
+                CemBinding binding = CAPES.computeIfAbsent(model, ignored -> {
+                    Map<String, ModelRenderer> parts = new java.util.LinkedHashMap<>();
+                    parts.put("cloak", body.parts.get("cloak"));
+                    parts.put("cape", body.parts.get("cloak"));
+                    return new CemBinding(new ModelBase() {}, parts);
+                });
+                CemResources.Selection selection = CemResources.INSTANCE
+                    .select(Collections.singletonList("player_cape"), binding, body.object);
+                if (selection != null) {
+                    capeEntry = selection.entry;
+                    body.evaluate();
+                    body.frame.atOrigin(body.entry.model.root, body.instance.pose, scale);
+                    CemModel.Node modern = selection.entry.model.originalParts.get("cape");
+                    boolean modernCape = modern != null && !modern.vanillaGeometry;
+                    if (!modernCape) {
+                        org.lwjgl.opengl.GL11.glTranslatef(0, 0, 2 * scale);
+                        org.lwjgl.opengl.GL11.glRotatef(180, 0, 1, 0);
+                    }
+                    Draw cape = new Draw(
+                        binding,
+                        selection.entry,
+                        body.object,
+                        subject.partialTicks,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        texture);
+                    cape.extras = true;
+                    cape.inputs.putAll(body.inputs);
+                    draw = cape;
+                    renderPart(cape, modernCape ? "cape" : "cloak", scale, false);
+                    return;
+                }
+            }
+        } catch (Exception exception) {
+            if (capeEntry != null) CemResources.INSTANCE.fail(capeEntry.model, exception);
+        } finally {
+            org.lwjgl.opengl.GL11.glPopMatrix();
+            draw = previous;
+            rendering = previousRendering;
+        }
+        // Player body files can contain cloak placeholders; only the dedicated cape model owns this pass.
+        rendering = true;
+        try {
+            nativeRender.run();
+        } finally {
+            rendering = previousRendering;
         }
     }
 
@@ -273,9 +338,10 @@ public final class CemRuntime {
     private static boolean armorPart(ModelBase model, ModelRenderer part, float scale, boolean rotationOrder) {
         if (!(model instanceof net.minecraft.client.model.ModelBiped) || subject == null
             || subject.primaryDraw == null
-            || texture == null
-            || !texture.getResourcePath()
-                .startsWith("textures/models/armor/"))
+            || texture == null) return false;
+        String path = texture.getResourcePath();
+        if (path.startsWith("textures/models/armor/")) subject.armorModels.add(model);
+        else if (!path.equals("textures/misc/enchanted_item_glint.png") || !subject.armorModels.contains(model))
             return false;
         Draw body = subject.primaryDraw;
         if (!(body.binding.nativeModel instanceof net.minecraft.client.model.ModelBiped)
@@ -376,6 +442,7 @@ public final class CemRuntime {
         final float partialTicks;
         final Subject parent;
         final Map<ModelBase, Draw> draws = new IdentityHashMap<>();
+        final Set<ModelBase> armorModels = Collections.newSetFromMap(new IdentityHashMap<>());
         CemResources.Entry primary;
         Draw primaryDraw;
 
@@ -478,6 +545,7 @@ public final class CemRuntime {
             if (entry != null && !evaluated) {
                 if (staticPose) {
                     instance.staticPose(pose -> binding.pose(entry.model, pose, object, parts));
+                    binding.playerLayers(instance, true);
                     evaluated = true;
                     return;
                 }
@@ -489,6 +557,7 @@ public final class CemRuntime {
                             for (int i = 0; i < 6; i++) pose[node.index * CemModel.STRIDE + i] = captured.getValue()[i];
                     }
                 });
+                binding.playerLayers(instance, false);
                 evaluated = true;
             }
         }

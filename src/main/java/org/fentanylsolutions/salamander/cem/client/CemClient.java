@@ -133,6 +133,14 @@ public final class CemClient {
         }
         values.put("id", (double) entity.getEntityId());
         if (living != null) {
+            double[] movement = org.fentanylsolutions.salamander.cem.animation.CemMovement.direction(
+                entity.posX - entity.prevPosX,
+                entity.posZ - entity.prevPosZ,
+                interpolateAngle(living.prevRenderYawOffset, living.renderYawOffset, partialTicks));
+            values.put("move_forward", movement[0]);
+            values.put("move_strafing", movement[1]);
+            values.put("is_climbing", living.isOnLadder() ? 1d : 0d);
+            values.put("is_gliding", CemBackportPoses.gliding(living) ? 1d : 0d);
             values.put("health", (double) living.getHealth());
             values.put("max_health", (double) living.getMaxHealth());
             values.put("hurt_time", living.hurtTime > 0 ? Math.max(0, living.hurtTime - partialTicks) : 0d);

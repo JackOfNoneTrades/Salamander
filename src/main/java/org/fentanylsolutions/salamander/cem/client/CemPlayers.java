@@ -31,6 +31,10 @@ public final class CemPlayers {
         return subject instanceof AbstractClientPlayer && model instanceof ModelBiped && MODELS.contains(model);
     }
 
+    public static boolean registered(ModelBase model) {
+        return MODELS.contains(model);
+    }
+
     public static void register(ModelBiped model) {
         MODELS.add(model);
     }

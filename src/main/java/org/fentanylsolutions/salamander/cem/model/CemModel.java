@@ -55,6 +55,13 @@ public final class CemModel {
                 "rot_x",
                 "rot_y",
                 "swing_progress",
+                "move_forward",
+                "move_strafing",
+                "is_climbing",
+                "is_crawling",
+                "is_swimming",
+                "is_gliding",
+                "is_first_person_hand",
                 "id",
                 "is_aggressive",
                 "is_alive",
@@ -190,10 +197,14 @@ public final class CemModel {
 
         /** Match a native follower to its animated bone without overwriting explicit follower animations. */
         public void followPose(String source, String target) {
+            followPose(source, target, false);
+        }
+
+        public void followPose(String source, String target, boolean force) {
             Node from = originalParts.get(source), to = originalParts.get(target);
             if (from == null || to == null) return;
             int fromOffset = from.index * STRIDE, toOffset = to.index * STRIDE;
-            for (int i = 0; i < 9; i++) if (!animated[toOffset + i]) pose[toOffset + i] = pose[fromOffset + i];
+            for (int i = 0; i < 9; i++) if (force || !animated[toOffset + i]) pose[toOffset + i] = pose[fromOffset + i];
         }
 
         public boolean evaluated(long frame) {

@@ -238,6 +238,8 @@ public final class CemExpressionParser {
             case "log":
             case "frac":
             case "signum":
+            case "wraprad":
+            case "wrapdeg":
                 required = 1;
                 break;
             default:
@@ -283,6 +285,10 @@ public final class CemExpressionParser {
                     return Math.log(x);
                 case "frac":
                     return x - Math.floor(x);
+                case "wraprad":
+                    return wrap(x, Math.PI);
+                case "wrapdeg":
+                    return wrap(x, 180);
                 case "signum":
                     return Math.signum(x);
                 case "pow":
@@ -301,6 +307,13 @@ public final class CemExpressionParser {
                     throw new IllegalStateException(name);
             }
         };
+    }
+
+    private static double wrap(double value, double halfTurn) {
+        double wrapped = value % (2 * halfTurn);
+        if (wrapped >= halfTurn) wrapped -= 2 * halfTurn;
+        if (wrapped < -halfTurn) wrapped += 2 * halfTurn;
+        return wrapped;
     }
 
     public static boolean truth(double value) {
