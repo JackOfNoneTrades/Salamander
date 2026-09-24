@@ -29,6 +29,10 @@ public class EarlyMixinLoader implements IEarlyMixinLoader, IFMLLoadingPlugin {
         if (FMLLaunchHandler.side()
             .isClient()) {
             mixins.add("minecraft.client.AccessorMinecraft");
+            mixins.add("minecraft.client.renderer.MixinImageBufferDownloadCem");
+            mixins.add("minecraft.client.renderer.MixinThreadDownloadImageDataCem");
+            mixins.add("minecraft.client.renderer.texture.MixinDynamicTextureCem");
+            mixins.add("minecraft.client.resources.MixinSkinManagerCem");
             mixins.add("minecraft.client.renderer.MixinRenderBlocksCemBed");
             mixins.add("minecraft.client.renderer.MixinRenderBlocksCemMushrooms");
             mixins.add("minecraft.client.renderer.entity.MixinRenderMooshroomCem");

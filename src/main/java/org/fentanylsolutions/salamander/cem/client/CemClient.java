@@ -43,6 +43,8 @@ public final class CemClient {
 
     public static void clearAnimationState() {
         STATES.clear();
+        CemPlayers.clear();
+        CemPlayerSkins.clear();
         CemRuleFacts.clear();
         previousTime = 0;
     }
@@ -123,6 +125,12 @@ public final class CemClient {
         values.put("pos_x", interpolate(entity.prevPosX, entity.posX, partialTicks));
         values.put("pos_y", interpolate(entity.prevPosY, entity.posY, partialTicks));
         values.put("pos_z", interpolate(entity.prevPosZ, entity.posZ, partialTicks));
+        if (player != null) {
+            double dx = values.get("pos_x") - values.get("player_pos_x");
+            double dy = values.get("pos_y") - values.get("player_pos_y");
+            double dz = values.get("pos_z") - values.get("player_pos_z");
+            values.put("distance", Math.sqrt(dx * dx + dy * dy + dz * dz));
+        }
         values.put("id", (double) entity.getEntityId());
         if (living != null) {
             values.put("health", (double) living.getHealth());

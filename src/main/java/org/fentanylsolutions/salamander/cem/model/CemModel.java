@@ -41,6 +41,7 @@ public final class CemModel {
                 "frame_time",
                 "frame_counter",
                 "dimension",
+                "distance",
                 "rule_index",
                 "health",
                 "hurt_time",
@@ -197,6 +198,12 @@ public final class CemModel {
 
         public boolean evaluated(long frame) {
             return lastFrame == frame;
+        }
+
+        /** First-person hands use the pack geometry with the native hand pose, without body animations. */
+        public void staticPose(Consumer<double[]> vanillaPose) {
+            System.arraycopy(defaults, 0, pose, 0, defaults.length);
+            vanillaPose.accept(pose);
         }
 
         /** Reuses the evaluated pose across eye, hurt, and shader passes in the same client frame. */

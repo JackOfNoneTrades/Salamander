@@ -11,6 +11,10 @@ public final class CemConfig {
     @Config.DefaultBoolean(true)
     public static boolean enabled = true;
 
+    @Config.Comment("Load player.jem and player_slim.jem from resource packs. Reload resources after changing.")
+    @Config.DefaultBoolean(true)
+    public static boolean playerModels = true;
+
     @Config.Comment("Render emissive textures associated with custom entity models. Reload resources after changing.")
     @Config.DefaultBoolean(true)
     public static boolean emissiveTextures = true;

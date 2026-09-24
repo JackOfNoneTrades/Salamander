@@ -13,6 +13,7 @@ final class CemTextureAliases {
 
     private static final Map<String, List<String>> NAMES = new HashMap<>();
     static {
+        alias("steve", "player/wide/steve");
         alias("cow/cow", "cow/cow_temperate");
         alias("cow/mooshroom", "cow/mooshroom_red");
         alias("cow/brown_mooshroom", "cow/mooshroom_brown");

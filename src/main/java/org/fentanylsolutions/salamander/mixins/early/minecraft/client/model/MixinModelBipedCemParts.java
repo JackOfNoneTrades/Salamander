@@ -27,6 +27,10 @@ public abstract class MixinModelBipedCemParts implements CemModelParts {
     private ModelRenderer bipedRightLeg;
     @Shadow
     private ModelRenderer bipedLeftLeg;
+    @Shadow
+    private ModelRenderer bipedEars;
+    @Shadow
+    private ModelRenderer bipedCloak;
 
     @Override
     public Map<String, ModelRenderer> salamander$cemParts() {
@@ -38,6 +42,8 @@ public abstract class MixinModelBipedCemParts implements CemModelParts {
         parts.put("left_arm", bipedLeftArm);
         parts.put("right_leg", bipedRightLeg);
         parts.put("left_leg", bipedLeftLeg);
+        parts.put("ear", bipedEars);
+        parts.put("cloak", bipedCloak);
         return parts;
     }
 }

@@ -113,8 +113,7 @@ public final class CemRuntime {
         draw = null;
         if (!CemConfig.enabled || !(model instanceof CemModelParts)) return previous;
         Object object = entity != null ? entity : subject == null ? model : subject.object;
-        CemBinding binding = BINDINGS
-            .computeIfAbsent(model, m -> new CemBinding(m, ((CemModelParts) m).salamander$cemParts()));
+        CemBinding binding = binding(model, object);
         CemResources.Selection selected = CemResources.INSTANCE
             .select(candidates == null ? CemTargets.candidates(object, model, texture) : candidates, binding, object);
         CemResources.Entry entry = selected == null ? null : selected.entry;
@@ -142,6 +141,18 @@ public final class CemRuntime {
         return previous;
     }
 
+    private static CemBinding binding(ModelBase model, Object object) {
+        CemBinding binding = BINDINGS.get(model);
+        if (binding == null || CemPlayers.model(object, model)) {
+            Map<String, ModelRenderer> parts = ((CemModelParts) model).salamander$cemParts();
+            if (binding == null || !binding.matches(parts)) {
+                binding = new CemBinding(model, parts);
+                BINDINGS.put(model, binding);
+            }
+        }
+        return binding;
+    }
+
     public static void end(Draw previous, float scale) {
         Draw current = draw;
         try {
@@ -157,6 +168,31 @@ public final class CemRuntime {
             }
         } finally {
             draw = previous;
+        }
+    }
+
+    public static boolean firstPersonArm(net.minecraft.client.model.ModelBiped model,
+        net.minecraft.entity.player.EntityPlayer player, float scale) {
+        if (!CemConfig.enabled || !(model instanceof CemModelParts) || !CemPlayers.model(player, model)) return false;
+        Subject previousSubject = enter(player, 0);
+        Draw previousDraw = draw;
+        Draw hand = null;
+        try {
+            CemBinding binding = binding(model, player);
+            CemResources.Selection selection = CemResources.INSTANCE
+                .select(CemTargets.candidates(player, model, texture), binding, player);
+            if (selection == null) return false;
+            hand = new Draw(binding, selection.entry, player, 0, 0, 0, 0, 0, 0, texture, true);
+            hand.extras = true;
+            draw = hand;
+            return renderPart(hand, "right_arm", scale, false);
+        } catch (Exception exception) {
+            if (hand != null) CemResources.INSTANCE.fail(hand.entry.model, exception);
+            return false;
+        } finally {
+            rendering = false;
+            draw = previousDraw;
+            leave(previousSubject);
         }
     }
 
@@ -359,6 +395,7 @@ public final class CemRuntime {
         final Map<String, Double> inputs;
         final ResourceLocation texture;
         final Object object;
+        final boolean staticPose;
         final Map<String, Draw> layers = new HashMap<>();
         final CemRenderFrame frame;
         final Set<CemModel.Node> reachable = Collections.newSetFromMap(new IdentityHashMap<>());
@@ -368,12 +405,21 @@ public final class CemRuntime {
 
         Draw(CemBinding binding, CemResources.Entry entry, Object object, float partial, float limb, float speed,
             float age, float yaw, float pitch, ResourceLocation texture) {
+            this(binding, entry, object, partial, limb, speed, age, yaw, pitch, texture, false);
+        }
+
+        Draw(CemBinding binding, CemResources.Entry entry, Object object, float partial, float limb, float speed,
+            float age, float yaw, float pitch, ResourceLocation texture, boolean staticPose) {
             this.binding = binding;
             this.parts = binding.parts(object);
             this.entry = entry;
-            this.texture = texture;
+            this.texture = entry != null && CemPlayers.model(object, binding.nativeModel)
+                ? CemPlayerSkins.texture(texture)
+                : texture;
             this.object = object;
-            instance = entry == null ? null : CemClient.instance(object, entry.model);
+            this.staticPose = staticPose;
+            instance = entry == null ? null
+                : staticPose ? entry.model.newInstance() : CemClient.instance(object, entry.model);
             ModelBase nativeModel = binding.nativeModel;
             String type = nativeModel.getClass()
                 .getName();
@@ -399,6 +445,7 @@ public final class CemRuntime {
             parts = parent.parts;
             entry = selection.entry;
             object = parent.object;
+            staticPose = parent.staticPose;
             frame = parent.frame;
             ResourceLocation layerTexture = parent.texture;
             if (entry.model.source.getResourcePath()
@@ -429,6 +476,11 @@ public final class CemRuntime {
 
         void evaluate() {
             if (entry != null && !evaluated) {
+                if (staticPose) {
+                    instance.staticPose(pose -> binding.pose(entry.model, pose, object, parts));
+                    evaluated = true;
+                    return;
+                }
                 instance.evaluate(CemClient.frame(), inputs, pose -> {
                     binding.pose(entry.model, pose, object, parts);
                     for (Map.Entry<String, float[]> captured : collected.entrySet()) {

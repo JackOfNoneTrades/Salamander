@@ -74,6 +74,7 @@ public final class CemGeometry {
             if (mask != null) selected = mask;
         }
         selected = CemResources.INSTANCE.texture(selected);
+        net.minecraft.util.ResourceLocation previousResource = CemRuntime.texture();
         int previous = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
         boolean normalized = GL11.glIsEnabled(GL11.GL_NORMALIZE);
         GL11.glEnable(GL11.GL_NORMALIZE);
@@ -84,7 +85,7 @@ public final class CemGeometry {
             renderPart(node, pose, vanilla, scale, rotationOrder, selected, eyes);
         } finally {
             GL11.glBindTexture(GL11.GL_TEXTURE_2D, previous);
-            CemRuntime.texture(texture);
+            CemRuntime.texture(previousResource);
             if (!normalized) GL11.glDisable(GL11.GL_NORMALIZE);
         }
     }
@@ -143,8 +144,8 @@ public final class CemGeometry {
                 if (!eyes && node.vanillaGeometry
                     && CemBoatChest.part(node.vanillaPart)
                     && !vanilla.containsKey(node.vanillaPart)) CemBoatChest.render(node.vanillaPart, scale);
-                drawGeometry(node, vanilla, scale);
-                if (!eyes) CemEmissive.render(selected, () -> drawGeometry(node, vanilla, scale));
+                drawGeometry(node, vanilla, scale, selected);
+                if (!eyes) CemEmissive.render(selected, () -> drawGeometry(node, vanilla, scale, selected));
             }
             for (CemModel.Node child : node.children) renderPart(child, pose, vanilla, scale, false, selected, eyes);
         } finally {
@@ -159,9 +160,16 @@ public final class CemGeometry {
             && vanilla.get("left_wing") == vanilla.get("right_wing");
     }
 
-    private void drawGeometry(CemModel.Node node, Map<String, ModelRenderer> vanilla, float scale) {
+    private void drawGeometry(CemModel.Node node, Map<String, ModelRenderer> vanilla, float scale,
+        net.minecraft.util.ResourceLocation texture) {
         ModelRenderer original = node.vanillaGeometry ? vanilla.get(node.vanillaPart) : null;
         if (original != null) {
+            int previousTexture = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
+            net.minecraft.util.ResourceLocation previousResource = CemRuntime.texture();
+            net.minecraft.util.ResourceLocation nativeTexture = CemPlayerSkins.nativeTexture(texture, original);
+            if (nativeTexture != null && !nativeTexture.equals(texture)) net.minecraft.client.Minecraft.getMinecraft()
+                .getTextureManager()
+                .bindTexture(nativeTexture);
             boolean mirrored = dragonMirror(node, vanilla);
             if (mirrored) {
                 GL11.glPushMatrix();
@@ -172,6 +180,8 @@ public final class CemGeometry {
             try {
                 for (ModelBox box : original.cubeList) box.render(Tessellator.instance, scale);
             } finally {
+                GL11.glBindTexture(GL11.GL_TEXTURE_2D, previousTexture);
+                CemRuntime.texture(previousResource);
                 if (mirrored) {
                     GL11.glPopAttrib();
                     GL11.glPopMatrix();

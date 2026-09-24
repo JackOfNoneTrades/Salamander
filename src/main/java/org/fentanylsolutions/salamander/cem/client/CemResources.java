@@ -18,6 +18,7 @@ import net.minecraft.util.ResourceLocation;
 
 import org.fentanylsolutions.salamander.Salamander;
 import org.fentanylsolutions.salamander.cem.loading.CemLoader;
+import org.fentanylsolutions.salamander.cem.loading.CemModelPaths;
 import org.fentanylsolutions.salamander.cem.model.CemModel;
 import org.fentanylsolutions.salamander.config.CemConfig;
 
@@ -40,6 +41,7 @@ public final class CemResources implements IResourceManagerReloadListener {
     private IResourceManager manager;
     private String suffix;
     private final Map<String, Entry> definitions = new HashMap<>();
+    private final Map<String, ResourceLocation> modelPaths = new HashMap<>();
     private final Map<ResourceLocation, Boolean> available = new HashMap<>();
     private final java.util.List<ResourceLocation> generatedTextures = new java.util.ArrayList<>();
     private final Map<ResourceLocation, ResourceLocation> textures = new HashMap<>();
@@ -49,18 +51,21 @@ public final class CemResources implements IResourceManagerReloadListener {
     private CemResources() {}
 
     public boolean hasTargets(java.util.List<String> names) {
-        for (String name : names) if (exists(new ResourceLocation("minecraft", "optifine/cem/" + name + ".jem"))
-            || exists(new ResourceLocation("minecraft", "optifine/cem/" + name + "/" + name + ".jem"))) return true;
+        for (String name : names) if (modelPath(name) != null) return true;
         return false;
+    }
+
+    private ResourceLocation modelPath(String name) {
+        if (!modelPaths.containsKey(name))
+            modelPaths.put(name, CemModelPaths.select(name, this::exists, CemResources::priority));
+        return modelPaths.get(name);
     }
 
     public Selection select(java.util.List<String> candidates, CemBinding binding, Object subject) {
         if (!CemConfig.enabled || manager == null) return null;
         for (String name : candidates) {
-            ResourceLocation resource = new ResourceLocation("minecraft", "optifine/cem/" + name + ".jem");
-            if (!exists(resource))
-                resource = new ResourceLocation("minecraft", "optifine/cem/" + name + "/" + name + ".jem");
-            if (!exists(resource)) continue;
+            ResourceLocation resource = modelPath(name);
+            if (resource == null) continue;
             Variants choices = variants.computeIfAbsent(resource, this::variants);
             org.fentanylsolutions.salamander.cem.loading.CemRules.Selection choice = choices
                 .select(CemRuleFacts.get(subject));
@@ -250,6 +255,7 @@ public final class CemResources implements IResourceManagerReloadListener {
         this.manager = manager;
         suffix = emissiveSuffix(manager);
         definitions.clear();
+        modelPaths.clear();
         available.clear();
         variants.clear();
         textures.clear();

@@ -50,6 +50,40 @@ public class CemLoaderTest {
     }
 
     @Test
+    public void replacementsRetainEveryCustomSiblingIncludingEarlierAttachments() throws Exception {
+        Map<ResourceLocation, String> files = new HashMap<>();
+        files.put(
+            SOURCE,
+            "{\"models\":[" + "{\"part\":\"head\",\"id\":\"attached\",\"attach\":true},"
+                + "{\"part\":\"head\",\"id\":\"face\"},"
+                + "{\"part\":\"head\",\"id\":\"skull\"}]}");
+        CemModel model = load(files);
+        CemModel.Node head = model.originalParts.get("head");
+        assertFalse(head.vanillaGeometry);
+        assertEquals(3, head.children.size());
+        assertSame(model.find("face", null, null), head.children.get(1));
+        assertSame(model.find("skull", null, null), head.children.get(2));
+    }
+
+    @Test
+    public void staticHandPoseUsesNativeTransformsWithoutRunningBodyAnimations() throws Exception {
+        Map<ResourceLocation, String> files = new HashMap<>();
+        files.put(
+            SOURCE,
+            "{\"models\":[{\"part\":\"head\",\"animations\":[{\"head.rx\":\"2\",\"var.counter\":\"var.counter+1\"}]}]}");
+        CemModel model = load(files);
+        CemModel.Instance instance = model.newInstance();
+        int rotation = model.originalParts.get("head").index * CemModel.STRIDE + 3;
+        instance.staticPose(pose -> pose[rotation] = .5);
+        assertEquals(.5, instance.pose[rotation], 0);
+        assertTrue(instance.variables.isEmpty());
+        assertFalse(instance.evaluated(1));
+        instance.evaluate(1, Collections.emptyMap(), pose -> {});
+        assertEquals(2, instance.pose[rotation], 0);
+        assertEquals(1, instance.variables.get("var.counter"), 0);
+    }
+
+    @Test
     public void detectsMissingCyclicAndUnboundResources() {
         Map<ResourceLocation, String> files = new HashMap<>();
         files.put(SOURCE, "{\"models\":[{\"part\":\"head\",\"model\":\"a.jpm\"}]}");

@@ -110,6 +110,13 @@ public final class CemTargets {
     public static List<String> candidates(Object subject, ModelBase model, ResourceLocation texture) {
         String target = target(subject);
         String tex = texture == null ? "" : texture.getResourcePath();
+        if (CemPlayers.model(subject, model)) {
+            if (!org.fentanylsolutions.salamander.config.CemConfig.playerModels) return Collections.emptyList();
+            if (tex.startsWith("textures/models/armor/")) return Collections.emptyList();
+            return Collections.singletonList(
+                CemPlayers.slim((net.minecraft.client.entity.AbstractClientPlayer) subject, model) ? "player_slim"
+                    : "player");
+        }
         if (model instanceof ModelSkeletonHead || model.getClass()
             .getName()
             .endsWith(".ModelHead")) {

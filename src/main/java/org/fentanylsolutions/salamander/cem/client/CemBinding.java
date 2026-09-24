@@ -31,9 +31,11 @@ public final class CemBinding {
     public final Map<String, float[]> pivots = new LinkedHashMap<>();
     public final Map<String, String> parents = new LinkedHashMap<>();
     public final Map<String, String> groups = new HashMap<>();
+    private final Map<String, ModelRenderer> namedParts;
 
     public CemBinding(ModelBase model, Map<String, ModelRenderer> named) {
         nativeModel = model;
+        namedParts = new LinkedHashMap<>(named);
         ModelRenderer first = named.values()
             .stream()
             .filter(Objects::nonNull)
@@ -106,6 +108,11 @@ public final class CemBinding {
         if (model.getClass()
             .getName()
             .equals("ganymedes01.etfuturum.client.model.ModelRaft")) groups.put("back", "bottom");
+    }
+
+    /** Player renderers may swap native arm objects when alternating between wide and slim skins. */
+    public boolean matches(Map<String, ModelRenderer> named) {
+        return namedParts.equals(named);
     }
 
     private void virtual(String name, String parent, float x, float y, float z) {

@@ -90,8 +90,9 @@ public final class CemLoader {
                 parent.vanillaGeometry = false;
                 // Named native children have their own CEM slots (villager nose, bee torso, etc.).
                 // Replacing a parent removes its geometry and anonymous children, not those slots.
-                if (parent == root) parent.children.clear();
-                else parent.children.removeIf(child -> child.vanillaPart == null || child.vanillaPart.startsWith("$"));
+                // Several entries can replace the same slot. Preserve custom siblings already loaded.
+                parent.children.removeIf(
+                    child -> child.vanillaPart != null && (parent == root || child.vanillaPart.startsWith("$")));
             }
             CemModel.Node custom = parsePart(model, parent, textureSize, location, 0);
             parent.children.add(custom);
