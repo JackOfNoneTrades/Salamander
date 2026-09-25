@@ -46,6 +46,7 @@ public final class CemClient {
         CemPlayers.clear();
         CemPlayerSkins.clear();
         CemRuleFacts.clear();
+        CemRandomTextures.clearEntities();
         previousTime = 0;
     }
 

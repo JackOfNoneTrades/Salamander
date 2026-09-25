@@ -15,12 +15,17 @@ import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Standard Random Entities predicates used only to select CEM models; does not replace entity textures. */
+/** Ordered Random Entities predicates shared by model and texture selection. */
 public final class CemRules {
 
     public interface Facts {
 
         String value(String key);
+
+        default List<String> values(String key) {
+            String value = value(key);
+            return value == null ? java.util.Collections.emptyList() : java.util.Collections.singletonList(value);
+        }
 
         List<String> nbt(String path, boolean raw);
 
@@ -57,16 +62,35 @@ public final class CemRules {
     private final List<Rule> rules = new ArrayList<>();
 
     public CemRules(Properties properties) {
+        this(properties, false);
+    }
+
+    public CemRules(Properties properties, boolean textures) {
         SortedSet<Integer> indices = new TreeSet<>();
-        for (String key : properties.stringPropertyNames())
-            if (key.matches("models\\.[1-9][0-9]{0,4}")) indices.add(Integer.parseInt(key.substring(7)));
+        String keys = textures ? "(?:textures|skins)" : "models";
+        for (String key : properties.stringPropertyNames()) if (key.matches(keys + "\\.[1-9][0-9]{0,4}"))
+            indices.add(Integer.parseInt(key.substring(key.indexOf('.') + 1)));
         for (int index : indices) {
-            Rule rule = new Rule(index, integers(properties.getProperty("models." + index)));
+            String indicesValue = textures
+                ? properties.getProperty("textures." + index, properties.getProperty("skins." + index))
+                : properties.getProperty("models." + index);
+            Rule rule = new Rule(index, integers(indicesValue));
             String weights = properties.getProperty("weights." + index);
             if (weights != null) {
                 rule.weights = integers(weights);
-                if (rule.weights.length != rule.models.length)
-                    throw new IllegalArgumentException("weights." + index + ": count differs from models");
+                if (rule.weights.length != rule.models.length) {
+                    if (!textures)
+                        throw new IllegalArgumentException("weights." + index + ": count differs from models");
+                    int oldLength = rule.weights.length;
+                    long sum = 0;
+                    for (int weight : rule.weights) sum += weight;
+                    rule.weights = Arrays.copyOf(rule.weights, rule.models.length);
+                    if (oldLength < rule.weights.length) Arrays.fill(
+                        rule.weights,
+                        oldLength,
+                        rule.weights.length,
+                        oldLength == 0 ? 1 : (int) (sum / oldLength));
+                }
             }
             for (int weight : rule.weights) {
                 if (weight < 0) throw new IllegalArgumentException("Negative CEM weight");
@@ -95,14 +119,31 @@ public final class CemRules {
                     String type = key.substring(0, key.length() - suffix.length());
                     String value = properties.getProperty(key)
                         .trim();
-                    if (type.equals("models") || type.equals("weights")) continue;
+                    if (type.equals("models") || type.equals("textures")
+                        || type.equals("skins")
+                        || type.equals("weights")) continue;
                     String actual = type.equals("collarColors") ? "colors" : type;
+                    if (actual.equals("distance")) actual = "distanceFromPlayer";
+                    if (actual.equals("isAngry")) actual = "angry";
                     Predicate<String> condition;
                     switch (actual) {
                         case "heights":
                         case "moonPhase":
                         case "dayTime":
                         case "sizes":
+                        case "maxHealth":
+                        case "speed":
+                        case "jumpStrength":
+                        case "distanceFromPlayer":
+                        case "light":
+                        case "hour":
+                        case "minute":
+                        case "second":
+                        case "monthDay":
+                        case "month":
+                        case "weekDay":
+                        case "yearDay":
+                        case "year":
                             condition = range(value);
                             break;
                         case "minHeight":
@@ -118,23 +159,41 @@ public final class CemRules {
                         case "name":
                             condition = match(value);
                             break;
+                        case "teams":
+                        case "language":
+                        case "dimension":
+                            condition = stringChoices(
+                                actual.equals("dimension") ? value.replace("minecraft:", "") : value);
+                            break;
                         case "biomes":
                         case "colors":
                         case "weather":
                         case "professions":
                         case "blocks":
+                        case "items":
                             condition = choices(value, actual);
                             break;
                         case "baby":
+                        case "creeperCharged":
+                        case "playerCreated":
+                        case "angry":
+                        case "moving":
                             if (!value.equals("true") && !value.equals("false"))
-                                throw new IllegalArgumentException("Invalid baby rule");
+                                throw new IllegalArgumentException("Invalid boolean rule: " + key);
                             condition = value::equals;
                             break;
                         default:
                             throw new IllegalArgumentException("Unsupported CEM rule property: " + key);
                     }
                     String field = actual.equals("minHeight") || actual.equals("maxHeight") ? "heights" : actual;
-                    rule.conditions.add(f -> condition.test(f.value(field)));
+                    if (field.equals("blocks") || field.equals("items")) {
+                        boolean invert = value.startsWith("!");
+                        Predicate<String> item = choices(invert ? value.substring(1) : value, field);
+                        rule.conditions.add(
+                            f -> f.values(field)
+                                .stream()
+                                .anyMatch(item) != invert);
+                    } else rule.conditions.add(f -> condition.test(f.value(field)));
                 }
             }
             rules.add(rule);
@@ -197,6 +256,7 @@ public final class CemRules {
     public static Predicate<String> range(String expression) {
         List<double[]> ranges = new ArrayList<>();
         for (String token : expression.trim()
+            .replaceAll("\\s+-\\s+", "-")
             .split("\\s+")) {
             Matcher match = RANGE.matcher(token);
             if (!match.matches()) throw new IllegalArgumentException("Invalid range: " + token);
@@ -214,6 +274,11 @@ public final class CemRules {
     }
 
     private static Predicate<String> choices(String expression, String type) {
+        String positive = expression.startsWith("!") ? expression.substring(1) : expression;
+        if (positive.matches("(?s)(?:i?regex|i?pattern):.*")) {
+            Predicate<String> pattern = match(expression);
+            return value -> pattern.test(value == null ? null : normalize(value, type));
+        }
         boolean invert = expression.startsWith("!");
         String[] choices = (invert ? expression.substring(1) : expression).split("\\s+");
         return value -> {
@@ -248,11 +313,67 @@ public final class CemRules {
         };
     }
 
+    private static Predicate<String> stringChoices(String expression) {
+        String positive = expression.startsWith("!") ? expression.substring(1) : expression;
+        if (positive.matches("(?s)(?:i?regex|i?pattern):.*")) return match(expression);
+        Set<String> choices = new HashSet<>();
+        Matcher tokens = Pattern.compile("\"([^\"]*)\"|([^\\s]+)")
+            .matcher(positive);
+        while (tokens.find()) choices.add(tokens.group(1) == null ? tokens.group(2) : tokens.group(1));
+        return value -> choices.contains(value) != expression.startsWith("!");
+    }
+
     public static String normalize(String value, String type) {
         String result = value.toLowerCase(Locale.ROOT)
             .replace("minecraft:", "");
-        if (type.equals("biomes")) return result.replace("_", "")
-            .replace(" ", "");
+        if (type.equals("biomes")) {
+            result = result.replace("_", "")
+                .replace(" ", "");
+            switch (result) {
+                case "snowyplains":
+                case "snowytundra":
+                    return "iceplains";
+                case "icespikes":
+                    return "iceplainsspikes";
+                case "windswepthills":
+                case "mountains":
+                    return "extremehills";
+                case "windsweptforest":
+                case "woodedmountains":
+                    return "extremehills+";
+                case "snowytaiga":
+                    return "coldtaiga";
+                case "snowytaigahills":
+                    return "coldtaigahills";
+                case "oldgrowthpinetaiga":
+                case "gianttreetaiga":
+                    return "megataiga";
+                case "oldgrowthsprucetaiga":
+                case "giantsprucetaiga":
+                    return "megasprucetaiga";
+                case "snowybeach":
+                    return "coldbeach";
+                case "stonyshore":
+                case "stoneshore":
+                    return "stonebeach";
+                case "badlands":
+                    return "mesa";
+                case "woodedbadlands":
+                    return "mesaplateauf";
+                case "darkforest":
+                    return "roofedforest";
+                case "swamp":
+                    return "swampland";
+                case "nether":
+                case "netherwastes":
+                    return "hell";
+                case "theend":
+                case "end":
+                    return "sky";
+                default:
+                    return result;
+            }
+        }
         if (type.equals("blocks")) {
             result = BLOCK_ALIASES.getOrDefault(result, result);
             if (result.startsWith("etfuturum:")) {

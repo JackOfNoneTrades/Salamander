@@ -64,6 +64,14 @@ public final class CemRuntime {
         return subject == null ? null : subject.object;
     }
 
+    static org.fentanylsolutions.salamander.cem.loading.CemRules.Selection textureChoice() {
+        return subject == null ? null : subject.textureChoice;
+    }
+
+    static void textureChoice(org.fentanylsolutions.salamander.cem.loading.CemRules.Selection choice) {
+        if (subject != null && subject.textureChoice == null) subject.textureChoice = choice;
+    }
+
     public static boolean itemFrame() {
         for (Subject scope = subject; scope != null; scope = scope.parent)
             if (scope.object instanceof net.minecraft.entity.item.EntityItemFrame) return true;
@@ -437,6 +445,8 @@ public final class CemRuntime {
     }
 
     public static final class Subject {
+
+        org.fentanylsolutions.salamander.cem.loading.CemRules.Selection textureChoice;
 
         final Object object;
         final float partialTicks;

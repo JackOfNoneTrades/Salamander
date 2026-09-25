@@ -35,6 +35,7 @@ public abstract class MixinRenderSpiderCem extends RenderLiving {
         if (org.fentanylsolutions.salamander.cem.client.CemRuntime.active() == null || cir.getReturnValue() <= 0)
             return;
         CemResources.Entry entry = org.fentanylsolutions.salamander.cem.client.CemRuntime.active();
-        if (entry != null && entry.emissive != null) bindTexture(entry.emissive);
+        net.minecraft.util.ResourceLocation mask = entry == null ? null : CemResources.INSTANCE.emissive(entry.texture);
+        if (mask != null) bindTexture(mask);
     }
 }

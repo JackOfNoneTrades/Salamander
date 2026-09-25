@@ -3,17 +3,18 @@ package org.fentanylsolutions.salamander.mixins.early.minecraft.client.renderer.
 import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.util.ResourceLocation;
 
+import org.fentanylsolutions.salamander.cem.client.CemRandomTextures;
 import org.fentanylsolutions.salamander.cem.client.CemRuntime;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
 
 @Mixin(TextureManager.class)
 public abstract class MixinTextureManagerCem {
 
-    @Inject(method = "bindTexture", at = @At("HEAD"))
-    private void salamander$texture(ResourceLocation resource, CallbackInfo ci) {
+    @ModifyVariable(method = "bindTexture", at = @At("HEAD"), argsOnly = true)
+    private ResourceLocation salamander$texture(ResourceLocation resource) {
         CemRuntime.texture(resource);
+        return CemRandomTextures.resolve(resource);
     }
 }

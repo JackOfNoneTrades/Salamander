@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.WeakHashMap;
 
 import net.minecraft.block.Block;
 import net.minecraft.entity.Entity;
@@ -29,7 +28,8 @@ import org.fentanylsolutions.salamander.mixins.early.minecraft.client.AccessorCe
 /** A lazy, per-tick snapshot. Ordinary rendering never serializes NBT unless a rule actually asks for it. */
 public final class CemRuleFacts implements CemRules.Facts {
 
-    private static final Map<Object, CemRuleFacts> CACHE = new WeakHashMap<>();
+    private static final Map<Object, CemRuleFacts> CACHE = new com.google.common.collect.MapMaker().weakKeys()
+        .makeMap();
     private static final String[] COLORS = { "white", "orange", "magenta", "light_blue", "yellow", "lime", "pink",
         "gray", "light_gray", "cyan", "purple", "blue", "brown", "green", "red", "black" };
     private final WeakReference<Object> subject;
@@ -76,6 +76,10 @@ public final class CemRuleFacts implements CemRules.Facts {
             Block block = world.getBlock(x, blockY, z);
             String name = String.valueOf(Block.blockRegistry.getNameForObject(block));
             values.put("blocks", name + ":" + world.getBlockMetadata(x, blockY, z));
+            values.put(
+                "blocksInside",
+                String.valueOf(Block.blockRegistry.getNameForObject(world.getBlock(x, y, z))) + ":"
+                    + world.getBlockMetadata(x, y, z));
         }
         if (tile != null && tile.getWorldObj() != null && tile.getBlockType() instanceof net.minecraft.block.BlockBed) {
             String blockName = String.valueOf(Block.blockRegistry.getNameForObject(tile.getBlockType()));
@@ -120,8 +124,122 @@ public final class CemRuleFacts implements CemRules.Facts {
                 if (color > 0 && color <= 16) values.put(key, COLORS[color - 1]);
             }
         }
+        if (!values.containsKey(key)) values.put(key, extra(key));
         return values.get(key);
     }
+
+    @Override
+    public List<String> values(String key) {
+        String value = value(key);
+        return value == null ? java.util.Collections.emptyList()
+            : key.equals("items") ? java.util.Arrays.asList(value.split("\n"))
+                : java.util.Collections.singletonList(value);
+    }
+
+    private String extra(String key) {
+        Object object = subject.get();
+        Entity entity = object instanceof Entity ? (Entity) object : null;
+        EntityLivingBase living = entity instanceof EntityLivingBase ? (EntityLivingBase) entity : null;
+        TileEntity tile = object instanceof TileEntity ? (TileEntity) object : null;
+        World world = entity != null ? entity.worldObj : tile == null ? null : tile.getWorldObj();
+        switch (key) {
+            case "items":
+                if (living == null) return null;
+                List<String> items = new ArrayList<>();
+                boolean wearing = false, holding = false;
+                for (int slot = 0; slot < 5; slot++) {
+                    net.minecraft.item.ItemStack stack = living.getEquipmentInSlot(slot);
+                    if (stack == null) continue;
+                    items.add(String.valueOf(net.minecraft.item.Item.itemRegistry.getNameForObject(stack.getItem())));
+                    if (slot == 0) holding = true;
+                    else wearing = true;
+                }
+                if (holding) items.add("holding");
+                if (wearing) items.add("wearing");
+                items.add(holding || wearing ? "any" : "none");
+                return String.join("\n", items);
+            case "maxHealth":
+                return living == null ? null : String.valueOf(living.getMaxHealth());
+            case "speed":
+                net.minecraft.entity.ai.attributes.IAttributeInstance speed = living == null ? null
+                    : living.getEntityAttribute(net.minecraft.entity.SharedMonsterAttributes.movementSpeed);
+                return speed == null ? null : String.valueOf(speed.getBaseValue());
+            case "jumpStrength":
+                return entity instanceof net.minecraft.entity.passive.EntityHorse
+                    ? String.valueOf(((net.minecraft.entity.passive.EntityHorse) entity).getHorseJumpStrength())
+                    : null;
+            case "teams":
+                return living == null || living.getTeam() == null ? null
+                    : living.getTeam()
+                        .getRegisteredName();
+            case "creeperCharged":
+                return entity instanceof net.minecraft.entity.monster.EntityCreeper
+                    ? String.valueOf(((net.minecraft.entity.monster.EntityCreeper) entity).getPowered())
+                    : null;
+            case "playerCreated":
+                return entity instanceof net.minecraft.entity.monster.EntityIronGolem
+                    ? String.valueOf(((net.minecraft.entity.monster.EntityIronGolem) entity).isPlayerCreated())
+                    : null;
+            case "angry":
+                if (entity instanceof net.minecraft.entity.monster.EntityEnderman)
+                    return String.valueOf(((net.minecraft.entity.monster.EntityEnderman) entity).isScreaming());
+                if (entity instanceof net.minecraft.entity.monster.EntityBlaze)
+                    return String.valueOf(((net.minecraft.entity.monster.EntityBlaze) entity).func_70845_n());
+                if (entity instanceof EntityWolf) return String.valueOf(((EntityWolf) entity).isAngry());
+                return null;
+            case "moving":
+                return entity == null ? null
+                    : String.valueOf(
+                        Math.abs(entity.posX - entity.prevPosX) + Math.abs(entity.posZ - entity.prevPosZ) > 0.0001);
+            case "distanceFromPlayer":
+                net.minecraft.entity.player.EntityPlayer player = net.minecraft.client.Minecraft
+                    .getMinecraft().thePlayer;
+                if (player == null) return null;
+                return entity != null ? String.valueOf(entity.getDistanceToEntity(player))
+                    : tile == null ? null
+                        : String.valueOf(
+                            Math.sqrt(player.getDistanceSq(tile.xCoord + 0.5, tile.yCoord + 0.5, tile.zCoord + 0.5)));
+            case "dimension":
+                if (world == null) return null;
+                int id = world.provider.dimensionId;
+                return id == 0 ? "overworld" : id == -1 ? "the_nether" : id == 1 ? "the_end" : String.valueOf(id);
+            case "light":
+                if (world == null) return null;
+                return String.valueOf(
+                    world.getBlockLightValue(
+                        entity != null ? MathHelper.floor_double(entity.posX) : tile.xCoord,
+                        entity != null ? MathHelper.floor_double(entity.posY) : tile.yCoord,
+                        entity != null ? MathHelper.floor_double(entity.posZ) : tile.zCoord));
+            case "language":
+                return net.minecraft.client.Minecraft.getMinecraft().gameSettings.language
+                    .toLowerCase(java.util.Locale.ROOT);
+            case "hour":
+                return calendar(java.util.Calendar.HOUR_OF_DAY);
+            case "minute":
+                return calendar(java.util.Calendar.MINUTE);
+            case "second":
+                return calendar(java.util.Calendar.SECOND);
+            case "monthDay":
+                return calendar(java.util.Calendar.DAY_OF_MONTH);
+            case "month":
+                return calendar(java.util.Calendar.MONTH);
+            case "weekDay":
+                return calendar(java.util.Calendar.DAY_OF_WEEK);
+            case "yearDay":
+                return calendar(java.util.Calendar.DAY_OF_YEAR);
+            case "year":
+                return calendar(java.util.Calendar.YEAR);
+            default:
+                return null;
+        }
+    }
+
+    private String calendar(int field) {
+        if (calendar == null) calendar = java.util.Calendar.getInstance();
+        return String.valueOf(calendar.get(field));
+    }
+
+    private java.util.Calendar calendar;
 
     @Override
     public long seed() {

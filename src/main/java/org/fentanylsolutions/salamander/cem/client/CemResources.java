@@ -31,7 +31,7 @@ public final class CemResources implements IResourceManagerReloadListener {
         packs = new java.util.ArrayList<>(value);
     }
 
-    private static int priority(ResourceLocation texture) {
+    static int priority(ResourceLocation texture) {
         for (int i = packs.size() - 1; i >= 0; i--) if (packs.get(i)
             .resourceExists(texture)) return i;
         return -1;
@@ -97,7 +97,7 @@ public final class CemResources implements IResourceManagerReloadListener {
                             binding.parents,
                             binding.textureWidth,
                             binding.textureHeight);
-                ResourceLocation texture = model.texture == null ? texture(CemRuntime.texture()) : model.texture;
+                ResourceLocation texture = model.texture == null ? CemRuntime.texture() : model.texture;
                 entry = new Entry(model, texture, emissive(texture));
                 Salamander.LOG.info(
                     "Loaded CEM '{}' ({} parts, {} animation assignments)",
@@ -226,6 +226,7 @@ public final class CemResources implements IResourceManagerReloadListener {
     }
 
     public ResourceLocation emissive(ResourceLocation texture) {
+        texture = texture(CemRandomTextures.resolve(texture));
         if (suffix == null || texture == null
             || !texture.getResourcePath()
                 .endsWith(".png"))
@@ -260,6 +261,7 @@ public final class CemResources implements IResourceManagerReloadListener {
         variants.clear();
         textures.clear();
         failed.clear();
+        CemRandomTextures.reload(manager);
         CemClient.clearAnimationState();
         CemRuntime.clear();
         CemChestHalves.clear();

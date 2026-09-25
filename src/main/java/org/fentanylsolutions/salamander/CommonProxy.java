@@ -19,6 +19,7 @@ public class CommonProxy {
         try {
             ConfigurationManager.registerConfig(DebugConfig.class);
             ConfigurationManager.registerConfig(CemConfig.class);
+            ConfigurationManager.registerConfig(org.fentanylsolutions.salamander.config.TextureConfig.class);
         } catch (ConfigException exception) {
             throw new IllegalStateException("Unable to register Salamander configuration", exception);
         }

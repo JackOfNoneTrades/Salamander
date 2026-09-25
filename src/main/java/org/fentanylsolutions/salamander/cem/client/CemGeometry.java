@@ -73,7 +73,7 @@ public final class CemGeometry {
             net.minecraft.util.ResourceLocation mask = CemResources.INSTANCE.emissive(model.texture);
             if (mask != null) selected = mask;
         }
-        selected = CemResources.INSTANCE.texture(selected);
+        selected = CemResources.INSTANCE.texture(CemRandomTextures.resolve(selected));
         net.minecraft.util.ResourceLocation previousResource = CemRuntime.texture();
         int previous = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
         boolean normalized = GL11.glIsEnabled(GL11.GL_NORMALIZE);
